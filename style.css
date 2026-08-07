@@ -112,6 +112,28 @@ h2.title span{color:var(--violet); font-family:'Fira Code',monospace; font-size:
 .pill:hover{color:var(--fg)}
 .pill.active{color:#fff; background:linear-gradient(110deg,var(--violet),var(--magenta)); border-color:transparent}
 
+/* story prose (about) */
+.story{max-width:760px}
+.story p{color:var(--muted); font-size:clamp(1rem,2.4vw,1.18rem); margin-bottom:1.3rem}
+.story p b{color:var(--fg)}
+.story code{font-family:'Fira Code',monospace; font-size:.85em; background:rgba(124,92,255,.14); color:#c9bcff; padding:.1rem .4rem; border-radius:6px}
+
+/* timeline (about) */
+.timeline{position:relative; margin-left:.5rem}
+.timeline::before{content:''; position:absolute; left:19px; top:8px; bottom:8px; width:2px;
+  background:linear-gradient(180deg,var(--violet),var(--cyan),var(--magenta))}
+.tl-item{position:relative; display:flex; gap:1.3rem; padding-bottom:2rem}
+.tl-item:last-child{padding-bottom:0}
+.tl-dot{flex:0 0 40px; width:40px; height:40px; border-radius:50%; display:grid; place-items:center; font-size:1.1rem;
+  background:var(--card); border:1px solid var(--border); backdrop-filter:blur(6px); z-index:1}
+.tl-body{flex:1; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:1.2rem 1.4rem;
+  backdrop-filter:blur(8px); transition:transform .25s,border-color .25s}
+.tl-body:hover{transform:translateX(5px); border-color:rgba(124,92,255,.4)}
+.tl-when{font-family:'Fira Code',monospace; font-size:.75rem; color:var(--cyan); margin-bottom:.3rem}
+.tl-body h3{font-size:1.2rem; margin-bottom:.4rem}
+.tl-body p{color:var(--muted); font-size:.95rem; margin-bottom:.8rem}
+.tl-body .stack{margin-bottom:0}
+
 /* contact */
 .contact{text-align:center; padding-bottom:5rem}
 .contact p{color:var(--muted); margin-bottom:2rem; max-width:520px; margin-inline:auto}
