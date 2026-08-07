@@ -166,6 +166,40 @@ h2.title span{color:var(--violet); font-family:'Fira Code',monospace; font-size:
 .socials svg{width:22px; height:22px; fill:var(--fg)}
 footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Code',monospace; font-size:.82rem; border-top:1px solid var(--border); position:relative; z-index:1}
 
+/* eyebrow label */
+.eyebrow{font-family:'Fira Code',monospace; font-size:.78rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--cyan); margin-bottom:1rem}
+
+/* companies row */
+.company-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1rem}
+.company{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:1.1rem 1rem; text-align:center;
+  backdrop-filter:blur(8px); transition:transform .25s,border-color .25s}
+.company:hover{transform:translateY(-4px); border-color:rgba(124,92,255,.4)}
+.company .c-emoji{font-size:1.6rem; margin-bottom:.4rem}
+.company .c-name{font-weight:600; font-size:1rem}
+.company .c-sub{color:var(--muted); font-size:.8rem}
+.company .c-yr{margin-top:.4rem; font-family:'Fira Code',monospace; font-size:.7rem; color:var(--cyan)}
+
+/* flagship cards */
+.flagrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1.4rem}
+.fla{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:1.7rem; backdrop-filter:blur(8px);
+  position:relative; overflow:hidden; transition:transform .25s,box-shadow .25s,border-color .25s}
+.fla::before{content:''; position:absolute; inset:0; background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(124,92,255,.12),transparent 40%); opacity:0; transition:opacity .3s}
+.fla:hover::before{opacity:1}
+.fla:hover{transform:translateY(-6px); border-color:rgba(124,92,255,.4); box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.fla-top{display:flex; justify-content:space-between; align-items:flex-start; gap:.8rem}
+.fla-top h3{font-size:1.3rem; line-height:1.2}
+.fla-tag{flex:0 0 auto; font-family:'Fira Code',monospace; font-size:.68rem; color:#c9bcff; background:rgba(124,92,255,.16);
+  border:1px solid rgba(124,92,255,.3); border-radius:999px; padding:.2rem .7rem; white-space:nowrap}
+.fla-co{color:var(--cyan); font-family:'Fira Code',monospace; font-size:.78rem; margin:.3rem 0 1rem}
+.fla-block{margin-bottom:.9rem}
+.fla-lbl{display:block; font-family:'Fira Code',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--muted); margin-bottom:.25rem}
+.fla-block p{color:var(--fg); font-size:.92rem; line-height:1.5}
+.fla-impact{display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0}
+.fla-impact span{font-family:'Fira Code',monospace; font-size:.74rem; font-weight:600; color:#7ef0c9;
+  background:rgba(34,211,140,.1); border:1px solid rgba(34,211,140,.25); border-radius:8px; padding:.28rem .6rem}
+
 /* ---- mobile (kept last so it wins the cascade over base rules above) ---- */
 @media(max-width:600px){
   nav{flex-wrap:wrap; row-gap:.5rem; padding:.8rem 1.2rem}
@@ -175,4 +209,7 @@ footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Co
   .hero{min-height:auto; padding-top:6.5rem; padding-bottom:3rem}
   .hero h1{font-size:clamp(1.85rem,8.5vw,2.6rem); overflow-wrap:break-word}
   .hero .cta .btn{flex:1 1 100%; justify-content:center}
+  .flagrid{grid-template-columns:1fr}
+  .fla{padding:1.3rem}
+  .fla-top{flex-direction:column; gap:.5rem}
 }

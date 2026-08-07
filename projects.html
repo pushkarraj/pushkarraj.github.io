@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Projects — Pushkar Raj</title>
-<meta name="description" content="Projects by Pushkar Raj — Data Science, ML, MLOps, Computer Vision, and Robotics." />
+<meta name="description" content="Flagship GenAI & ML work by Pushkar Raj — multi-agent RAG, Text2SQL, Graph RAG, and document AI shipped at Siemens, Neuralgo, Ascendum, and Appnox." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -29,10 +29,24 @@
 
 <section class="page-head">
   <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Projects</h2>
-  <p>A decade of building — from self-balancing robots and drone navigation to modern ML pipelines and MLOps. <span id="count"></span> projects, filterable by domain.</p>
+  <p>Flagship GenAI &amp; ML systems shipped in production — plus a decade of building, from self-balancing robots to modern ML pipelines.</p>
 </section>
 
-<section style="padding-top:0">
+<!-- companies -->
+<section class="reveal" style="padding-top:0">
+  <div class="eyebrow">Where I've shipped</div>
+  <div class="company-row" id="companies"></div>
+</section>
+
+<!-- flagship -->
+<section class="reveal" id="flagship" style="padding-top:0">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4L12 17l-6.3 4.4L8 14 2 9.4h7.6z"/></svg>Flagship Work</h2>
+  <div class="flagrid" id="flagship-cards"></div>
+</section>
+
+<!-- full archive -->
+<section class="reveal" id="archive">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M4 4h16v5H4z"/><path d="M4 9v11h16V9"/><path d="M10 13h4"/></svg>Project Archive <span id="count" style="-webkit-text-fill-color:var(--muted);color:var(--muted);font-size:.5em;font-family:'Fira Code',monospace"></span></h2>
   <div class="filters" id="filters"></div>
   <div class="cards" id="cards"></div>
 </section>
@@ -40,11 +54,67 @@
 <footer>built with too much coffee ☕ · <a href="https://github.com/pushkarraj/pushkarraj.github.io" style="color:var(--muted)">source</a></footer>
 
 <script>
+// ---- companies ----
+const companies=[
+  {n:"Siemens",sub:"Brightly Software",yr:"2025 — Now",e:"🏢"},
+  {n:"Neuralgo.ai",sub:"GenAI products",yr:"2024 — 25",e:"🧠"},
+  {n:"Ascendum",sub:"Solutions",yr:"2023 — 24",e:"📄"},
+  {n:"Appnox",sub:"Technologies",yr:"2022 — 23",e:"⚙️"},
+  {n:"IIT Bombay",sub:"Project Engineer",yr:"2017 — 21",e:"🎓"}
+];
+document.getElementById('companies').innerHTML=companies.map(c=>
+  `<div class="company"><div class="c-emoji">${c.e}</div>
+   <div class="c-name">${c.n}</div><div class="c-sub">${c.sub}</div><div class="c-yr">${c.yr}</div></div>`).join('');
+
+// ---- flagship (from resume — use case / solution / impact) ----
+const flagship=[
+  {t:"NextGen CPGRAMS",co:"Govt. grievance platform",tag:"Graph RAG",
+   use:"Citizen complaints were routed by keyword matching, misrouting ~40% and dragging resolution to ~30 days.",
+   sol:"Built a Neo4j knowledge graph of 50k+ interconnected nodes (departments, officials, locations) with a Graph-RAG routing engine on FastAPI that reads complaint semantics.",
+   impact:["Misrouting 40% → <6%","15k+ complaints routed","Resolution 30d → 5d"],
+   s:["Neo4j","Graph RAG","FastAPI","Knowledge Graph"]},
+  {t:"Multi-Agent RAG System",co:"Siemens · Brightly Software",tag:"Multi-Agent",
+   use:"Enterprise workflows needed reliable, low-latency answers over sprawling internal knowledge with cross-session memory.",
+   sol:"Architected a multi-agent RAG on LangGraph + LangChain + Azure OpenAI, with OpenSearch Serverless retrieval and a persistent memory framework (LangMem, DynamoDB, Snowflake).",
+   impact:["+40% workflow modularity","+25% retrieval relevance","−45% latency, 3× throughput"],
+   s:["LangGraph","Azure OpenAI","OpenSearch","DynamoDB","Snowflake"]},
+  {t:"Text2SQL Engine",co:"Neuralgo.ai · UK client",tag:"Text2SQL",
+   use:"A UK client needed non-technical users to ask complex data questions in plain English over a relational database.",
+   sol:"Built a multi-agent system of specialized LLM agents generating SQL + summaries, backed by a Graph RAG converting the relational DB into an entity/relationship knowledge graph, with asyncio/multithread parallelism.",
+   impact:["−40% query latency","ROUGE + exec-accuracy validated","Human-eval for faithfulness"],
+   s:["Multi-Agent","Graph RAG","LLM","asyncio"]},
+  {t:"Text2SQL Chatbot Agent",co:"Neuralgo.ai · SA client",tag:"RAG Chatbot",
+   use:"A client needed a production chatbot answering real-time business questions directly against Snowflake.",
+   sol:"Developed a GenAI Text2SQL agent with Llama-Index + LLM, a LangChain RAG/Graph-RAG chatbot with custom embeddings, fine-tuning, and guardrails — shipped on AWS with CRUD APIs.",
+   impact:["Production-grade on AWS","Robust guardrails","Real-time Snowflake queries"],
+   s:["Llama-Index","LangChain","AWS","Fine-tuning"]},
+  {t:"Digital Examiner (DEX)",co:"Ascendum Solutions",tag:"Document AI",
+   use:"Itemized billing documents had to be classified and understood at scale from mixed document types.",
+   sol:"Introduced Document AI to the org — 92% SVM classifier for itemized bills, plus fine-tuned LiLT, LayoutLMv3, and Donut for document QA and TAPAS/TAPEX for table understanding.",
+   impact:["92% classification accuracy","Document QA in production","Structured table understanding"],
+   s:["LayoutLMv3","Donut","TAPAS","SVM"]},
+  {t:"LLM Automation at Scale",co:"Appnox Technologies",tag:"LLM Infra",
+   use:"Serving and fine-tuning 175B-parameter open models demanded fast, cost-controlled multi-node GPU infrastructure.",
+   sol:"Built EC2 GPU clusters with Ray, auto-scaling head/worker nodes, pipeline parallelism and sharding — deploying OPT-175B and BLOOM-175B across 4× AWS p3.16xlarge (512GB GPU).",
+   impact:["175B models in production","Multi-node inference","Self-hosted → lower cost"],
+   s:["Ray","OPT-175B","BLOOM","AWS","Sharding"]}
+];
+document.getElementById('flagship-cards').innerHTML=flagship.map(f=>
+  `<div class="fla">
+     <div class="fla-top"><h3>${f.t}</h3><span class="fla-tag">${f.tag}</span></div>
+     <div class="fla-co">${f.co}</div>
+     <div class="fla-block"><span class="fla-lbl">Use case</span><p>${f.use}</p></div>
+     <div class="fla-block"><span class="fla-lbl">Solution</span><p>${f.sol}</p></div>
+     <div class="fla-impact">${f.impact.map(i=>`<span>${i}</span>`).join('')}</div>
+     <div class="stack">${f.s.map(x=>`<span>${x}</span>`).join('')}</div>
+   </div>`).join('');
+
+// ---- full archive (earlier work) ----
 const projects=[
   {e:"🩺",y:"2022",cat:"ML",t:"Thyroid Disease Detection",d:"Predicts the risk of thyroid disease in patients using tuned tree ensembles and grid search.",s:["Machine Learning","XGBoost","Random Forest","Grid Search"]},
-  {e:"📚",y:"2022",cat:"ML",t:"Hybrid Book Recommender (POC)",d:"A hybrid of popularity and collaborative-filtering-based book recommender system.",s:["Scikit-Learn","Flask","Pandas","Heroku"]},
-  {e:"🎬",y:"2022",cat:"NLP",t:"Movies Recommender System (POC)",d:"Content-based movie recommender using a bag-of-words technique, served via Streamlit.",s:["NLP","NLTK","Text Vectorization","Streamlit"]},
-  {e:"🍷",y:"2022",cat:"MLOps",t:"Wine Chemical Analysis (POC)",d:"Analysis to predict fake wine from original, wrapped in a full MLOps pipeline.",s:["Linear Regression","ElasticNet","MLflow","DVC","GitHub Actions","Docker"]},
+  {e:"📚",y:"2022",cat:"ML",t:"Hybrid Book Recommender",d:"A hybrid of popularity and collaborative-filtering-based book recommender system.",s:["Scikit-Learn","Flask","Pandas","Heroku"]},
+  {e:"🎬",y:"2022",cat:"NLP",t:"Movies Recommender System",d:"Content-based movie recommender using a bag-of-words technique, served via Streamlit.",s:["NLP","NLTK","Text Vectorization","Streamlit"]},
+  {e:"🍷",y:"2022",cat:"MLOps",t:"Wine Chemical Analysis",d:"Analysis to predict fake wine from original, wrapped in a full MLOps pipeline.",s:["Linear Regression","ElasticNet","MLflow","DVC","GitHub Actions","Docker"]},
   {e:"🔬",y:"2018",cat:"MLOps",t:"Semiconductor Fault Detection",d:"KNN clustering to train different algorithms across clusters, deployed as a REST API with CI.",s:["Machine Learning","MLOps","Random Forest","XGBoost","REST API","CircleCI"]},
   {e:"🌫️",y:"2017",cat:"ML",t:"Radiosonde Visibility Prediction",d:"ML model for visibility prediction from meteorological data.",s:["Machine Learning","SQLite","K-Means","XGBoost","Random Forest"]},
   {e:"🤖",y:"2017",cat:"Robotics",t:"Modular Robot",d:"Mentored two students to build a modular robot with 3D-printed bodies that connect to avoid obstacles.",s:["Robotics","3D Printing"]},
@@ -55,7 +125,7 @@ const projects=[
 ];
 const cats=["All",...[...new Set(projects.map(p=>p.cat))]];
 const cardsEl=document.getElementById('cards');
-document.getElementById('count').textContent=projects.length;
+document.getElementById('count').textContent="· "+projects.length+" more";
 
 document.getElementById('filters').innerHTML=cats.map((c,i)=>
   `<button class="pill${i===0?' active':''}" data-cat="${c}">${c}</button>`).join('');
@@ -75,12 +145,18 @@ document.getElementById('filters').addEventListener('click',e=>{
   b.classList.add('active'); render(b.dataset.cat);
 });
 
+// scroll reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in'); io.unobserve(e.target);}
+}),{threshold:.08});
+document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+
 // cursor glow + card tilt
 const glow=document.getElementById('glow');
 addEventListener('mousemove',e=>{glow.style.opacity=1; glow.style.left=e.clientX+'px'; glow.style.top=e.clientY+'px';});
 addEventListener('mouseleave',()=>glow.style.opacity=0);
-cardsEl.addEventListener('mousemove',e=>{
-  const c=e.target.closest('.card'); if(!c)return;
+document.body.addEventListener('mousemove',e=>{
+  const c=e.target.closest('.card,.fla'); if(!c)return;
   const r=c.getBoundingClientRect();
   c.style.setProperty('--mx',(e.clientX-r.left)+'px');
   c.style.setProperty('--my',(e.clientY-r.top)+'px');
