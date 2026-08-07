@@ -105,8 +105,10 @@ document.getElementById('flagship-cards').innerHTML=flagship.map(f=>
      <div class="fla-co">${f.co}</div>
      <div class="fla-block"><span class="fla-lbl">Use case</span><p>${f.use}</p></div>
      <div class="fla-block"><span class="fla-lbl">Solution</span><p>${f.sol}</p></div>
-     <div class="fla-impact">${f.impact.map(i=>`<span>${i}</span>`).join('')}</div>
-     <div class="stack">${f.s.map(x=>`<span>${x}</span>`).join('')}</div>
+     <div class="fla-foot">
+       <div class="fla-impact">${f.impact.map(i=>`<span>${i}</span>`).join('')}</div>
+       <div class="stack">${f.s.map(x=>`<span>${x}</span>`).join('')}</div>
+     </div>
    </div>`).join('');
 
 // ---- full archive (earlier work) ----

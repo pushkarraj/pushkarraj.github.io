@@ -183,7 +183,8 @@ footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Co
 /* flagship cards */
 .flagrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:1.4rem}
 .fla{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:1.7rem; backdrop-filter:blur(8px);
-  position:relative; overflow:hidden; transition:transform .25s,box-shadow .25s,border-color .25s}
+  position:relative; overflow:hidden; transition:transform .25s,box-shadow .25s,border-color .25s;
+  display:flex; flex-direction:column}
 .fla::before{content:''; position:absolute; inset:0; background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(124,92,255,.12),transparent 40%); opacity:0; transition:opacity .3s}
 .fla:hover::before{opacity:1}
 .fla:hover{transform:translateY(-6px); border-color:rgba(124,92,255,.4); box-shadow:0 20px 50px rgba(0,0,0,.4)}
@@ -196,6 +197,7 @@ footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Co
 .fla-lbl{display:block; font-family:'Fira Code',monospace; font-size:.68rem; letter-spacing:.08em; text-transform:uppercase;
   color:var(--muted); margin-bottom:.25rem}
 .fla-block p{color:var(--fg); font-size:.92rem; line-height:1.5}
+.fla-foot{margin-top:auto}
 .fla-impact{display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0}
 .fla-impact span{font-family:'Fira Code',monospace; font-size:.74rem; font-weight:600; color:#7ef0c9;
   background:rgba(34,211,140,.1); border:1px solid rgba(34,211,140,.25); border-radius:8px; padding:.28rem .6rem}
