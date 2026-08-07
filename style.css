@@ -32,7 +32,6 @@ nav a{color:var(--muted); text-decoration:none; font-size:.92rem; transition:col
 nav a:hover,nav a.active{color:var(--fg)}
 nav a::after{content:''; position:absolute; left:0; bottom:-4px; width:0; height:2px; background:linear-gradient(90deg,var(--violet),var(--cyan)); transition:width .25s}
 nav a:hover::after,nav a.active::after{width:100%}
-@media(max-width:600px){nav ul{gap:1rem}}
 
 section{position:relative; z-index:1; padding:clamp(4rem,10vh,7rem) clamp(1.2rem,6vw,5rem); max-width:1100px; margin:0 auto}
 .reveal{opacity:0; transform:translateY(34px); transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
@@ -166,3 +165,14 @@ h2.title span{color:var(--violet); font-family:'Fira Code',monospace; font-size:
 .socials a:hover{transform:translateY(-4px); border-color:var(--violet); background:rgba(124,92,255,.12)}
 .socials svg{width:22px; height:22px; fill:var(--fg)}
 footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Code',monospace; font-size:.82rem; border-top:1px solid var(--border); position:relative; z-index:1}
+
+/* ---- mobile (kept last so it wins the cascade over base rules above) ---- */
+@media(max-width:600px){
+  nav{flex-wrap:wrap; row-gap:.5rem; padding:.8rem 1.2rem}
+  nav ul{gap:.55rem 1rem; flex-wrap:wrap; justify-content:flex-start; width:100%}
+  nav a{font-size:.82rem}
+  /* hero h1 floor of 2.6rem clipped past the right edge — shrink + allow wrap */
+  .hero{min-height:auto; padding-top:6.5rem; padding-bottom:3rem}
+  .hero h1{font-size:clamp(1.85rem,8.5vw,2.6rem); overflow-wrap:break-word}
+  .hero .cta .btn{flex:1 1 100%; justify-content:center}
+}
