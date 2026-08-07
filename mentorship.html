@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mentorship — Pushkar Raj</title>
+<meta name="description" content="1:1 Data Science & ML mentorship by Pushkar Raj — batches taught worldwide, Topmate sessions, and learner testimonials." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<style>
+.quote{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:1.6rem; backdrop-filter:blur(8px); position:relative}
+.quote .mark{font-size:3rem; line-height:.6; color:var(--violet); opacity:.4; font-family:Georgia,serif}
+.quote p{color:var(--fg); font-size:.98rem; margin:.4rem 0 1.2rem}
+.quote .who{display:flex; align-items:center; gap:.7rem}
+.quote .who .av{width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--violet),var(--cyan)); display:grid; place-items:center; font-weight:700; color:#fff; font-size:.9rem}
+.quote .who .nm{font-weight:600; font-size:.9rem}
+.quote .who .rl{color:var(--muted); font-size:.78rem; font-family:'Fira Code',monospace}
+.quote .stars{color:#ffc93c; font-size:.85rem; margin-bottom:.3rem}
+.empty{border:1px dashed var(--border); border-radius:16px; padding:2rem; text-align:center; color:var(--muted); font-family:'Fira Code',monospace; font-size:.85rem}
+.cta-box{background:linear-gradient(135deg,rgba(124,92,255,.14),rgba(34,211,238,.08)); border:1px solid rgba(124,92,255,.3); border-radius:22px; padding:clamp(1.6rem,4vw,2.6rem); text-align:center}
+.cta-box h3{font-size:clamp(1.3rem,3vw,1.8rem); margin-bottom:.6rem}
+.cta-box p{color:var(--muted); margin-bottom:1.5rem; max-width:520px; margin-inline:auto}
+</style>
+</head>
+<body>
+<div class="mesh"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+<div class="grain"></div>
+<div class="glow" id="glow"></div>
+
+<nav>
+  <a class="logo" href="index.html"><b>~/</b>pushkarraj</a>
+  <ul>
+    <li><a href="index.html#about">about</a></li>
+    <li><a href="projects.html">projects</a></li>
+    <li><a href="mentorship.html" class="active">mentorship</a></li>
+    <li><a href="index.html#contact">contact</a></li>
+  </ul>
+</nav>
+
+<section class="page-head">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M12 3L2 8l10 5 10-5-10-5z"/><path d="M6 10.5V16c0 1.5 3 3 6 3s6-1.5 6-3v-5.5"/></svg>Mentorship</h2>
+  <p>I've mentored learners across the world in Data Science, Machine Learning, and Generative AI — through structured batches and 1:1 sessions on Topmate. Here's the work, and what people say about it.</p>
+</section>
+
+<!-- stats -->
+<section style="padding-top:0">
+  <div class="stats">
+    <div class="stat">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+      <div class="num" data-count="500" data-suffix="+">0</div><div class="lbl">learners mentored</div>
+    </div>
+    <div class="stat">
+      <svg class="ico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <div class="num" data-count="10" data-suffix="+">0</div><div class="lbl">batches taught</div>
+    </div>
+    <div class="stat">
+      <svg class="ico" viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 5 2-7L2 9h7z"/></svg>
+      <div class="num" data-count="5" data-suffix=".0">0</div><div class="lbl">avg Topmate rating</div>
+    </div>
+    <div class="stat">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>
+      <div class="num" data-count="15" data-suffix="+">0</div><div class="lbl">countries reached</div>
+    </div>
+  </div>
+</section>
+
+<!-- batches -->
+<section class="reveal">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Batches taught</h2>
+  <div class="cards" id="batches"></div>
+</section>
+
+<!-- syllabus -->
+<section class="reveal">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Syllabus</h2>
+  <div class="empty" id="syllabus">📋 Syllabus coming soon — modules and curriculum will be added here.</div>
+</section>
+
+<!-- testimonials -->
+<section class="reveal">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>What learners say</h2>
+  <div class="cards" id="testimonials"></div>
+</section>
+
+<!-- topmate CTA -->
+<section class="reveal" style="padding-bottom:5rem">
+  <div class="cta-box">
+    <h3>Want 1:1 guidance?</h3>
+    <p>Book a session with me on Topmate — career advice, project reviews, mock interviews, or a deep-dive into any ML/DS topic.</p>
+    <a class="btn primary" href="https://topmate.io/pushkar10" target="_blank" rel="noreferrer">Book on Topmate ↗</a>
+  </div>
+</section>
+
+<footer>built with too much coffee ☕ · <a href="https://github.com/pushkarraj/pushkarraj.github.io" style="color:var(--muted)">source</a></footer>
+
+<script>
+// batches — placeholder structure, edit freely
+const batches=[
+  {e:"🎓",tag:"Cohort",t:"Data Science Bootcamp",d:"End-to-end DS — Python, statistics, ML, and deployment. Project-driven.",meta:"Global cohort"},
+  {e:"🤖",tag:"Cohort",t:"Machine Learning Intensive",d:"Core ML algorithms, model tuning, and real-world pipelines.",meta:"Multiple batches"},
+  {e:"🧠",tag:"Cohort",t:"Generative AI & NLP",d:"LLMs, embeddings, and building GenAI apps from scratch.",meta:"Recent batch"}
+];
+document.getElementById('batches').innerHTML=batches.map(b=>
+  `<div class="card"><div class="top"><div class="emoji">${b.e}</div><div class="year">${b.tag}</div></div>
+   <h3>${b.t}</h3><p>${b.d}</p>
+   <div class="stack"><span>${b.meta}</span></div></div>`).join('');
+
+// testimonials — add from Topmate/LinkedIn screenshots
+const testimonials=[
+  // {name:"", role:"", stars:5, text:""},
+];
+const tEl=document.getElementById('testimonials');
+if(testimonials.length){
+  tEl.innerHTML=testimonials.map(t=>
+    `<div class="quote"><div class="mark">"</div>
+     <div class="stars">${"★".repeat(t.stars)}${"☆".repeat(5-t.stars)}</div>
+     <p>${t.text}</p>
+     <div class="who"><div class="av">${t.name.trim()[0]||"?"}</div>
+       <div><div class="nm">${t.name}</div><div class="rl">${t.role||""}</div></div></div></div>`).join('');
+}else{
+  tEl.innerHTML=`<div class="empty" style="grid-column:1/-1">⭐ Testimonials coming soon — real reviews from Topmate &amp; learners will appear here.</div>`;
+}
+
+// count-up + reveal
+function countUp(el){
+  const raw=el.dataset.count, end=+raw, suf=el.dataset.suffix||''; let t0=null;
+  requestAnimationFrame(function step(t){
+    if(!t0)t0=t; const p=Math.min((t-t0)/900,1);
+    el.textContent=Math.round(p*end)+(p===1?suf:'');
+    if(p<1)requestAnimationFrame(step);
+  });
+}
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in');
+    e.target.querySelectorAll('.num[data-count]').forEach(countUp);
+    io.unobserve(e.target);}
+}),{threshold:.15});
+document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+document.querySelectorAll('.stats .num[data-count]').forEach(countUp);
+
+// cursor glow
+const glow=document.getElementById('glow');
+addEventListener('mousemove',e=>{glow.style.opacity=1; glow.style.left=e.clientX+'px'; glow.style.top=e.clientY+'px';});
+addEventListener('mouseleave',()=>glow.style.opacity=0);
+</script>
+</body>
+</html>
