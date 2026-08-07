@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Projects — Pushkar Raj</title>
+<meta name="description" content="Projects by Pushkar Raj — Data Science, ML, MLOps, Computer Vision, and Robotics." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="mesh"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+<div class="grain"></div>
+<div class="glow" id="glow"></div>
+
+<nav>
+  <a class="logo" href="index.html"><b>~/</b>pushkarraj</a>
+  <ul>
+    <li><a href="index.html#about">about</a></li>
+    <li><a href="index.html#skills">skills</a></li>
+    <li><a href="projects.html" class="active">projects</a></li>
+    <li><a href="index.html#contact">contact</a></li>
+  </ul>
+</nav>
+
+<section class="page-head">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Projects</h2>
+  <p>A decade of building — from self-balancing robots and drone navigation to modern ML pipelines and MLOps. <span id="count"></span> projects, filterable by domain.</p>
+</section>
+
+<section style="padding-top:0">
+  <div class="filters" id="filters"></div>
+  <div class="cards" id="cards"></div>
+</section>
+
+<footer>built with too much coffee ☕ · <a href="https://github.com/pushkarraj/pushkarraj.github.io" style="color:var(--muted)">source</a></footer>
+
+<script>
+const projects=[
+  {e:"🩺",y:"2022",cat:"ML",t:"Thyroid Disease Detection",d:"Predicts the risk of thyroid disease in patients using tuned tree ensembles and grid search.",s:["Machine Learning","XGBoost","Random Forest","Grid Search"]},
+  {e:"📚",y:"2022",cat:"ML",t:"Hybrid Book Recommender (POC)",d:"A hybrid of popularity and collaborative-filtering-based book recommender system.",s:["Scikit-Learn","Flask","Pandas","Heroku"]},
+  {e:"🎬",y:"2022",cat:"NLP",t:"Movies Recommender System (POC)",d:"Content-based movie recommender using a bag-of-words technique, served via Streamlit.",s:["NLP","NLTK","Text Vectorization","Streamlit"]},
+  {e:"🍷",y:"2022",cat:"MLOps",t:"Wine Chemical Analysis (POC)",d:"Analysis to predict fake wine from original, wrapped in a full MLOps pipeline.",s:["Linear Regression","ElasticNet","MLflow","DVC","GitHub Actions","Docker"]},
+  {e:"🔬",y:"2018",cat:"MLOps",t:"Semiconductor Fault Detection",d:"KNN clustering to train different algorithms across clusters, deployed as a REST API with CI.",s:["Machine Learning","MLOps","Random Forest","XGBoost","REST API","CircleCI"]},
+  {e:"🌫️",y:"2017",cat:"ML",t:"Radiosonde Visibility Prediction",d:"ML model for visibility prediction from meteorological data.",s:["Machine Learning","SQLite","K-Means","XGBoost","Random Forest"]},
+  {e:"🤖",y:"2017",cat:"Robotics",t:"Modular Robot",d:"Mentored two students to build a modular robot with 3D-printed bodies that connect to avoid obstacles.",s:["Robotics","3D Printing"]},
+  {e:"🚁",y:"2017",cat:"Robotics",t:"Indoor Drone Navigation (WhyCon)",d:"Mentored students developing indoor navigation algorithms using WhyCon markers in ROS.",s:["ROS","Computer Vision","WhyCon"]},
+  {e:"🛴",y:"2017",cat:"Robotics",t:"Two-Wheel Self-Balancing Robot",d:"A robot that stands on two wheels, maintaining its center of gravity under footfall.",s:["Control Systems","Embedded C"]},
+  {e:"🗺️",y:"2016",cat:"Robotics",t:"Navigate a Terrain — e-YRC 2017",d:"A problem set testing image processing and embedded C for terrain navigation.",s:["Image Processing","Embedded C"]},
+  {e:"🚗",y:"2015",cat:"Robotics",t:"Alcohol & Drowsiness Detection",d:"Reduces road accidents via IR-based eye-pattern reading and an alcohol sensor.",s:["IR Sensors","Embedded","Safety"]}
+];
+const cats=["All",...[...new Set(projects.map(p=>p.cat))]];
+const cardsEl=document.getElementById('cards');
+document.getElementById('count').textContent=projects.length;
+
+document.getElementById('filters').innerHTML=cats.map((c,i)=>
+  `<button class="pill${i===0?' active':''}" data-cat="${c}">${c}</button>`).join('');
+
+function render(cat){
+  const list=cat==="All"?projects:projects.filter(p=>p.cat===cat);
+  cardsEl.innerHTML=list.map(p=>
+    `<div class="card"><div class="top"><div class="emoji">${p.e}</div><div class="year">${p.y} · ${p.cat}</div></div>
+     <h3>${p.t}</h3><p>${p.d}</p>
+     <div class="stack">${p.s.map(x=>`<span>${x}</span>`).join('')}</div></div>`).join('');
+}
+render("All");
+
+document.getElementById('filters').addEventListener('click',e=>{
+  const b=e.target.closest('.pill'); if(!b)return;
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('active'));
+  b.classList.add('active'); render(b.dataset.cat);
+});
+
+// cursor glow + card tilt
+const glow=document.getElementById('glow');
+addEventListener('mousemove',e=>{glow.style.opacity=1; glow.style.left=e.clientX+'px'; glow.style.top=e.clientY+'px';});
+addEventListener('mouseleave',()=>glow.style.opacity=0);
+cardsEl.addEventListener('mousemove',e=>{
+  const c=e.target.closest('.card'); if(!c)return;
+  const r=c.getBoundingClientRect();
+  c.style.setProperty('--mx',(e.clientX-r.left)+'px');
+  c.style.setProperty('--my',(e.clientY-r.top)+'px');
+});
+</script>
+</body>
+</html>
