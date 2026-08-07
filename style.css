@@ -134,6 +134,30 @@ h2.title span{color:var(--violet); font-family:'Fira Code',monospace; font-size:
 .tl-body p{color:var(--muted); font-size:.95rem; margin-bottom:.8rem}
 .tl-body .stack{margin-bottom:0}
 
+/* testimonials (mentorship) */
+.src-note{color:var(--muted); font-size:.9rem; margin:-1rem 0 1.6rem}
+.src-note a{color:var(--cyan); text-decoration:none}
+.src-note a:hover{text-decoration:underline}
+.quote{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:1.6rem 1.6rem 1.4rem;
+  backdrop-filter:blur(8px); position:relative; overflow:hidden; transition:transform .25s,border-color .25s}
+.quote:hover{transform:translateY(-6px); border-color:rgba(124,92,255,.4)}
+.quote .mark{position:absolute; top:-.2rem; right:1rem; font-size:5rem; line-height:1; font-family:Georgia,serif;
+  color:rgba(124,92,255,.16); pointer-events:none}
+.quote .stars{color:#ffc93c; letter-spacing:.1em; font-size:1rem; margin-bottom:.7rem}
+.quote p{color:var(--fg); font-size:1rem; line-height:1.55; margin-bottom:1.2rem; position:relative}
+.quote .who{display:flex; align-items:center; gap:.7rem}
+.quote .av{width:38px; height:38px; border-radius:50%; display:grid; place-items:center; font-weight:700; color:#fff;
+  background:linear-gradient(110deg,var(--violet),var(--magenta)); flex:0 0 38px}
+.quote .nm{font-weight:600; font-size:.9rem}
+.quote .rl{color:var(--muted); font-family:'Fira Code',monospace; font-size:.72rem}
+.empty{text-align:center; color:var(--muted); font-family:'Fira Code',monospace; font-size:.9rem;
+  padding:2rem; border:1px dashed var(--border); border-radius:16px}
+
+/* cta box (mentorship) */
+.cta-box{background:var(--card); border:1px solid var(--border); border-radius:20px; padding:2.4rem; text-align:center; backdrop-filter:blur(8px)}
+.cta-box h3{font-size:1.5rem; margin-bottom:.6rem}
+.cta-box p{color:var(--muted); max-width:520px; margin:0 auto 1.5rem}
+
 /* contact */
 .contact{text-align:center; padding-bottom:5rem}
 .contact p{color:var(--muted); margin-bottom:2rem; max-width:520px; margin-inline:auto}

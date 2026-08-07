@@ -58,7 +58,7 @@
     </div>
     <div class="stat">
       <svg class="ico" viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 7L12 17l-6.5 5 2-7L2 9h7z"/></svg>
-      <div class="num" data-count="5" data-suffix=".0">0</div><div class="lbl">avg Topmate rating</div>
+      <div class="num" data-count="4" data-suffix=".7">0</div><div class="lbl">avg session rating</div>
     </div>
     <div class="stat">
       <svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/></svg>
@@ -82,6 +82,7 @@
 <!-- testimonials -->
 <section class="reveal">
   <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>What learners say</h2>
+  <p class="src-note">From live classroom teaching in cohort programs and 1:1 guidance sessions on <a href="https://topmate.io/pushkar10" target="_blank" rel="noreferrer">Topmate</a>.</p>
   <div class="cards" id="testimonials"></div>
 </section>
 
@@ -108,9 +109,14 @@ document.getElementById('batches').innerHTML=batches.map(b=>
    <h3>${b.t}</h3><p>${b.d}</p>
    <div class="stack"><span>${b.meta}</span></div></div>`).join('');
 
-// testimonials — add from Topmate/LinkedIn screenshots
+// testimonials — real learner feedback from live cohorts & Topmate
 const testimonials=[
-  // {name:"", role:"", stars:5, text:""},
+  {name:"Cohort learner", role:"AI Agents & Multi-Agent Systems", stars:5, text:"These classes have significantly enhanced my AI competency and recently played an important role in helping me secure a senior leadership opportunity. The content is highly relevant, and the industry insights Pushkar shares add tremendous value — making the sessions both practical and inspiring."},
+  {name:"Cohort learner", role:"Prompt Engineering & API Integration", stars:5, text:"Pushkar is the best instructor I can name — immense patience to listen to us and hold the audience, with great presentation skills and a clear grasp of every concept. He answers all our questions and leaves us clarified. Looking forward to having him in all my upcoming sessions."},
+  {name:"Cohort learner", role:"NLP & Retrieval-Augmented Generation", stars:5, text:"Thanks for the end-to-end code for the RAG pipeline using LangChain, with detailed comments to understand the concepts. All the details and insights were nicely provided. Great session!"},
+  {name:"Cohort learner", role:"Prompt Engineering & API Integration", stars:5, text:"Pushkar is a great tutor — he teaches every concept and practical very well. I'm lucky to be part of his class."},
+  {name:"Mentee", role:"1:1 career session · Topmate", stars:5, text:"Pushkar is the best career coach. Go ahead with a 1-on-1 — he will solve your career issues strategically."},
+  {name:"Mentee", role:"1:1 session · Topmate", stars:5, text:"An amazing session by Pushkar. Cleared all of my doubts. In my search for a guide, I got the best guidance from Pushkar — I highly recommend a 1:1 with him."}
 ];
 const tEl=document.getElementById('testimonials');
 if(testimonials.length){
