@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://pushkarraj.github.io/sitemap.xml

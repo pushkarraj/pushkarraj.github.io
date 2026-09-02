@@ -202,6 +202,48 @@ footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Co
 .fla-impact span{font-family:'Fira Code',monospace; font-size:.74rem; font-weight:600; color:#7ef0c9;
   background:rgba(34,211,140,.1); border:1px solid rgba(34,211,140,.25); border-radius:8px; padding:.28rem .6rem}
 
+/* ---- blog index ---- */
+.post-card{display:block; text-decoration:none; color:inherit}
+.post-card:hover h3{color:var(--fg)}
+.post-card .year{color:var(--cyan)}
+.post-card h3{color:var(--fg); transition:color .2s}
+.post-meta-row{display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin-bottom:.7rem;
+  font-family:'Fira Code',monospace; font-size:.72rem; color:var(--muted)}
+.post-meta-row .dot{opacity:.5}
+
+/* ---- article / prose (blog post) ---- */
+.post{max-width:760px}
+.post-meta{display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin:.4rem 0 1.4rem;
+  font-family:'Fira Code',monospace; font-size:.82rem; color:var(--muted)}
+.post-meta .dot{opacity:.5}
+.post-lede{color:var(--fg); font-size:clamp(1.1rem,2.6vw,1.35rem); line-height:1.55; margin-bottom:1.8rem;
+  padding-bottom:1.8rem; border-bottom:1px solid var(--border)}
+.post-body{color:var(--muted); font-size:clamp(1rem,2.4vw,1.13rem); line-height:1.75}
+.post-body h2{color:var(--fg); font-size:clamp(1.4rem,3.6vw,1.9rem); font-weight:700; letter-spacing:-.01em;
+  margin:2.6rem 0 1rem; scroll-margin-top:6rem}
+.post-body h3{color:var(--fg); font-size:clamp(1.15rem,2.8vw,1.35rem); font-weight:600; margin:1.8rem 0 .7rem}
+.post-body p{margin-bottom:1.2rem}
+.post-body a{color:var(--cyan); text-decoration:none; border-bottom:1px solid rgba(34,211,238,.35)}
+.post-body a:hover{border-bottom-color:var(--cyan)}
+.post-body strong,.post-body b{color:var(--fg); font-weight:600}
+.post-body ul,.post-body ol{margin:0 0 1.3rem 1.3rem; display:flex; flex-direction:column; gap:.55rem}
+.post-body li{padding-left:.2rem}
+.post-body li::marker{color:var(--violet)}
+.post-body code{font-family:'Fira Code',monospace; font-size:.85em; background:rgba(124,92,255,.14);
+  color:#c9bcff; padding:.12rem .4rem; border-radius:6px}
+.post-body pre{background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px;
+  padding:1.1rem 1.3rem; overflow-x:auto; margin:0 0 1.5rem; backdrop-filter:blur(6px)}
+.post-body pre code{background:none; color:var(--fg); padding:0; font-size:.86rem; line-height:1.6}
+.post-body blockquote{margin:0 0 1.5rem; padding:.9rem 1.3rem; border-left:3px solid var(--violet);
+  background:rgba(124,92,255,.08); border-radius:0 12px 12px 0; color:var(--fg)}
+.post-body blockquote p{margin:0}
+.post-body h2 .n{color:var(--violet); font-family:'Fira Code',monospace; font-size:.7em; margin-right:.5rem}
+.post-figure{margin:1.6rem 0; display:flex; flex-wrap:wrap; gap:.5rem}
+.post-back{display:inline-flex; align-items:center; gap:.4rem; color:var(--muted); text-decoration:none;
+  font-family:'Fira Code',monospace; font-size:.85rem; transition:color .2s; margin-bottom:1.4rem}
+.post-back:hover{color:var(--fg)}
+.post-foot{margin-top:2.6rem; padding-top:1.8rem; border-top:1px solid var(--border)}
+
 /* ---- mobile (kept last so it wins the cascade over base rules above) ---- */
 @media(max-width:600px){
   /* sticky (not fixed) so the wrapping nav reserves its own height in flow and

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Blog — Pushkar Raj</title>
+<meta name="description" content="Writing on Data Science and Generative AI by Pushkar Raj — production RAG, multi-agent systems, LLMs, and MLOps, from real shipped work." />
+<link rel="canonical" href="https://pushkarraj.github.io/blog.html" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Blog — Pushkar Raj" />
+<meta property="og:description" content="Writing on Data Science and Generative AI — production RAG, multi-agent systems, LLMs, and MLOps." />
+<meta property="og:url" content="https://pushkarraj.github.io/blog.html" />
+<meta property="og:image" content="https://github.com/pushkarraj.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="mesh"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+<div class="grain"></div>
+<div class="glow" id="glow"></div>
+
+<nav>
+  <a class="logo" href="index.html"><b>~/</b>pushkarraj</a>
+  <ul>
+    <li><a href="about.html">about</a></li>
+    <li><a href="index.html#skills">skills</a></li>
+    <li><a href="projects.html">projects</a></li>
+    <li><a href="blog.html" class="active">blog</a></li>
+    <li><a href="mentorship.html">mentorship</a></li>
+    <li><a href="Pushkar_Raj_resume.pdf" download>resume ↓</a></li>
+    <li><a href="index.html#contact">contact</a></li>
+  </ul>
+</nav>
+
+<section class="page-head">
+  <h2 class="title"><svg class="tico" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Blog</h2>
+  <p>Notes from the field on Data Science and Generative AI — production RAG, multi-agent systems, LLMs, and MLOps. Written from real shipped work, not hype.</p>
+</section>
+
+<section class="reveal" style="padding-top:0">
+  <div class="cards" id="posts">
+
+    <a class="card post-card" href="blog/multi-agent-rag-production.html">
+      <div class="top">
+        <div class="emoji">🤖</div>
+        <div class="year">GenAI</div>
+      </div>
+      <div class="post-meta-row">
+        <span>Sep 3, 2026</span><span class="dot">·</span><span>~10 min</span>
+      </div>
+      <h3>Multi-Agent RAG in Production: Architecture &amp; Lessons</h3>
+      <p>Why single-agent RAG breaks down at scale, the multi-agent architecture that fixed it on LangGraph + Azure OpenAI, and the changes that lifted retrieval relevance 25% and cut latency 45%.</p>
+      <div class="stack"><span>Multi-Agent RAG</span><span>LangGraph</span><span>Azure OpenAI</span><span>OpenSearch</span></div>
+    </a>
+
+  </div>
+</section>
+
+<footer>built with too much coffee ☕ · <a href="https://github.com/pushkarraj/pushkarraj.github.io" style="color:var(--muted)">source</a></footer>
+
+<script>
+// cursor glow + card tilt
+const glow=document.getElementById('glow');
+addEventListener('mousemove',e=>{glow.style.opacity=1; glow.style.left=e.clientX+'px'; glow.style.top=e.clientY+'px';});
+addEventListener('mouseleave',()=>glow.style.opacity=0);
+document.body.addEventListener('mousemove',e=>{
+  const c=e.target.closest('.card'); if(!c)return;
+  const r=c.getBoundingClientRect();
+  c.style.setProperty('--mx',(e.clientX-r.left)+'px');
+  c.style.setProperty('--my',(e.clientY-r.top)+'px');
+});
+// scroll reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in'); io.unobserve(e.target);}
+}),{threshold:.08});
+document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+</script>
+</body>
+</html>
