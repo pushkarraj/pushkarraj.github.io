@@ -204,11 +204,15 @@ footer{text-align:center; padding:2rem; color:var(--muted); font-family:'Fira Co
 
 /* ---- mobile (kept last so it wins the cascade over base rules above) ---- */
 @media(max-width:600px){
-  nav{flex-wrap:wrap; row-gap:.5rem; padding:.8rem 1.2rem}
+  /* sticky (not fixed) so the wrapping nav reserves its own height in flow and
+     never overlaps the content below it, regardless of how many rows it wraps to */
+  nav{position:sticky; flex-wrap:wrap; row-gap:.5rem; padding:.8rem 1.2rem}
   nav ul{gap:.55rem 1rem; flex-wrap:wrap; justify-content:flex-start; width:100%}
   nav a{font-size:.82rem}
+  /* nav now reserves its own space, so no top-padding hack is needed to clear it */
+  .page-head{padding-top:2rem}
   /* hero h1 floor of 2.6rem clipped past the right edge — shrink + allow wrap */
-  .hero{min-height:auto; padding-top:6.5rem; padding-bottom:3rem}
+  .hero{min-height:auto; padding-top:2rem; padding-bottom:3rem}
   .hero h1{font-size:clamp(1.85rem,8.5vw,2.6rem); overflow-wrap:break-word}
   .hero .cta .btn{flex:1 1 100%; justify-content:center}
   .flagrid{grid-template-columns:1fr}
