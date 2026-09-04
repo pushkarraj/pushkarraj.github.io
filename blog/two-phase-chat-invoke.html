@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Split the Invoke: Initialize the Session Once, Process Every Turn Cheaply | Pushkar Raj</title>
+<meta name="description" content="How to break one bloated chat invoke into two phases — a session init that loads all static context once, and a lightweight per-turn process step — to cut latency and complexity using prompt caching in LangChain + Azure OpenAI." />
+<meta name="author" content="Pushkar Raj" />
+<link rel="canonical" href="https://pushkarraj.github.io/blog/two-phase-chat-invoke.html" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Split the Invoke: Initialize the Session Once, Process Every Turn Cheaply" />
+<meta property="og:description" content="Break one bloated chat invoke into a session init that loads static context once and a cheap per-turn process step — cutting latency and complexity with prompt caching." />
+<meta property="og:url" content="https://pushkarraj.github.io/blog/two-phase-chat-invoke.html" />
+<meta property="og:image" content="https://github.com/pushkarraj.png" />
+<meta property="og:site_name" content="Pushkar Raj" />
+<meta property="article:published_time" content="2026-09-04T09:30:00+05:30" />
+<meta property="article:author" content="Pushkar Raj" />
+<meta property="article:section" content="Generative AI" />
+<meta property="article:tag" content="Prompt Caching" />
+<meta property="article:tag" content="LangChain" />
+<meta property="article:tag" content="Azure OpenAI" />
+<meta property="article:tag" content="LLM Latency" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Split the Invoke: Initialize the Session Once, Process Every Turn Cheaply" />
+<meta name="twitter:description" content="Break one bloated chat invoke into a session init that loads static context once and a cheap per-turn process step — cutting latency and complexity with prompt caching." />
+<meta name="twitter:image" content="https://github.com/pushkarraj.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Split the Invoke: Initialize the Session Once, Process Every Turn Cheaply",
+  "description": "Break one bloated chat invoke into a session init that loads static context once and a cheap per-turn process step — cutting latency and complexity with prompt caching in LangChain + Azure OpenAI.",
+  "image": "https://github.com/pushkarraj.png",
+  "datePublished": "2026-09-04T09:30:00+05:30",
+  "dateModified": "2026-09-04T09:30:00+05:30",
+  "author": {
+    "@type": "Person",
+    "name": "Pushkar Raj",
+    "url": "https://pushkarraj.github.io/about.html"
+  },
+  "publisher": {
+    "@type": "Person",
+    "name": "Pushkar Raj"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://pushkarraj.github.io/blog/two-phase-chat-invoke.html"
+  },
+  "keywords": "prompt caching, prefix caching, chat invoke, session initialization, LangChain, Azure OpenAI, LLM latency, KV cache",
+  "articleSection": "Generative AI"
+}
+</script>
+</head>
+<body>
+<div class="mesh"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+<div class="grain"></div>
+<div class="glow" id="glow"></div>
+
+<nav>
+  <a class="logo" href="../index.html"><b>~/</b>pushkarraj</a>
+  <ul>
+    <li><a href="../about.html">about</a></li>
+    <li><a href="../index.html#skills">skills</a></li>
+    <li><a href="../projects.html">projects</a></li>
+    <li><a href="../blog.html" class="active">blog</a></li>
+    <li><a href="../mentorship.html">mentorship</a></li>
+    <li><a href="../Pushkar_Raj_resume.pdf" download>resume ↓</a></li>
+    <li><a href="../index.html#contact">contact</a></li>
+  </ul>
+</nav>
+
+<section class="page-head">
+  <a class="post-back" href="../blog.html">← all posts</a>
+  <h2 class="title" style="margin-bottom:.4rem">Split the Invoke: Initialize the Session Once, Process Every Turn Cheaply</h2>
+  <div class="post-meta">
+    <span>By Pushkar Raj</span><span class="dot">·</span>
+    <span>Sep 4, 2026</span><span class="dot">·</span>
+    <span>9:30 AM IST</span><span class="dot">·</span>
+    <span>~9 min read</span><span class="dot">·</span>
+    <span>Generative AI</span>
+  </div>
+  <div class="stack">
+    <span>Prompt Caching</span><span>LangChain</span><span>Azure OpenAI</span><span>LLM Latency</span><span>KV Cache</span>
+  </div>
+</section>
+
+<section class="reveal" style="padding-top:0">
+  <article class="post">
+    <p class="post-lede">
+      A chat feature usually starts as one call: build a big prompt — system instructions, tool definitions, a few
+      reference documents, some few-shot examples — bolt the user's message on the end, and <code>invoke()</code>. It
+      works. Then every single turn re-sends and re-processes that same wall of static text, and your latency and bill
+      scale with the part that <em>never changes</em>. The fix is to stop treating one turn as one atomic call. Split it
+      into two phases: <strong>initialize the session once</strong> with all the static context, then <strong>process
+      each turn cheaply</strong> against it.
+    </p>
+
+    <div class="post-body">
+      <h2><span class="n">01.</span>What a "complex chat invoke" really is</h2>
+      <p>
+        Picture the invoke behind a typical assistant. Conceptually it's one function that assembles everything and
+        fires it at the model on <em>every</em> user turn:
+      </p>
+      <pre><code># ❌ One invoke rebuilds and re-sends the whole world, every turn
+def answer(user_msg, history):
+    messages = [
+        SystemMessage(BIG_SYSTEM_PROMPT),   # static — same every turn
+        *FEW_SHOT_EXAMPLES,                 # static — same every turn
+        *load_reference_docs(),             # static — often re-read from disk!
+        *history,                           # grows over the conversation
+        HumanMessage(user_msg),             # the only truly new bit
+    ]
+    return llm.invoke(messages)</code></pre>
+      <p>
+        Look at the ratio. The system prompt, the tool schema, the few-shot block, the reference docs — that can be
+        thousands of tokens, and it is <strong>byte-for-byte identical</strong> on turn 2, turn 20, and turn 200. The
+        genuinely new information is one message. Yet the model prefills the entire payload from scratch each time. You
+        pay for it in three currencies: latency (time-to-first-token grows with the prefix), money (every static token
+        is re-billed), and code clarity (setup and per-turn logic are fused into one function that's hard to test).
+      </p>
+
+      <h2><span class="n">02.</span>The one distinction that unlocks everything: static vs dynamic</h2>
+      <p>
+        Before optimizing anything, split the payload in your head into two buckets:
+      </p>
+      <ul>
+        <li><strong>Static context</strong> — decided at setup and constant for the life of the session: system prompt,
+          persona, tool/function definitions, output schema, few-shot examples, and any reference material you inject
+          up front.</li>
+        <li><strong>Dynamic input</strong> — everything that changes turn to turn: the user's latest message, and the
+          rolling conversation history.</li>
+      </ul>
+      <p>
+        Once you see the payload this way, the redundancy is obvious: you are re-transmitting and re-computing the
+        static bucket on every call. The whole pattern below is just "compute the static bucket once, reuse it."
+      </p>
+
+      <h2><span class="n">03.</span>Two phases: <code>init_session()</code>, then <code>process()</code></h2>
+      <p>
+        Instead of one function that does setup <em>and</em> answering, write two. <code>init_session()</code> runs
+        once and produces a reusable, pre-configured session that already carries the static context.
+        <code>process()</code> runs per turn and appends only the dynamic input.
+      </p>
+
+      <figure style="margin:1.8rem 0">
+        <div style="background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:1.1rem; overflow-x:auto">
+          <svg viewBox="0 0 760 340" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="fig1t fig1d" font-family="'Space Grotesk',system-ui,sans-serif">
+            <title id="fig1t">One fat invoke versus a split session</title>
+            <desc id="fig1d">Before: all static layers plus the turn are processed by the model every turn. After: static context is initialized once into a cached session, and each turn only sends the new user input.</desc>
+            <!-- divider -->
+            <line x1="380" y1="36" x2="380" y2="316" stroke="rgba(255,255,255,.14)" stroke-width="1" stroke-dasharray="4 5" />
+
+            <!-- ===== BEFORE ===== -->
+            <text x="24" y="28" fill="#22d3ee" font-family="'Fira Code',monospace" font-size="12" letter-spacing="1.5">BEFORE</text>
+            <text x="92" y="28" fill="#e7e7f0" font-size="14" font-weight="600">one fat invoke()</text>
+
+            <!-- static layers -->
+            <g font-size="12">
+              <rect x="30" y="52" width="180" height="28" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="120" y="70" fill="#e7e7f0" text-anchor="middle">system prompt</text>
+              <rect x="30" y="86" width="180" height="28" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="120" y="104" fill="#e7e7f0" text-anchor="middle">tool defs</text>
+              <rect x="30" y="120" width="180" height="28" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="120" y="138" fill="#e7e7f0" text-anchor="middle">reference docs</text>
+              <rect x="30" y="154" width="180" height="28" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="120" y="172" fill="#e7e7f0" text-anchor="middle">few-shot</text>
+              <rect x="30" y="188" width="180" height="28" rx="6" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+              <text x="120" y="206" fill="#e7e7f0" text-anchor="middle">user turn</text>
+            </g>
+
+            <!-- arrow to LLM -->
+            <line x1="212" y1="134" x2="264" y2="134" stroke="#9a9ab0" stroke-width="1.6" marker-end="url(#ah)"/>
+            <rect x="266" y="106" width="64" height="56" rx="10" fill="rgba(255,255,255,.05)" stroke="var(--border)" stroke-width="1"/>
+            <text x="298" y="139" fill="#e7e7f0" font-size="13" text-anchor="middle" font-weight="600">LLM</text>
+            <text x="220" y="46" fill="#9a9ab0" font-family="'Fira Code',monospace" font-size="11">↻ every turn</text>
+            <text x="30" y="240" fill="#ff8a8a" font-family="'Fira Code',monospace" font-size="11.5">all 5 layers prefilled &amp; billed — every turn</text>
+
+            <!-- ===== AFTER ===== -->
+            <text x="404" y="28" fill="#ff5cf0" font-family="'Fira Code',monospace" font-size="12" letter-spacing="1.5">AFTER</text>
+            <text x="468" y="28" fill="#e7e7f0" font-size="14" font-weight="600">init once, process cheap</text>
+
+            <!-- static block -->
+            <g font-size="11.5">
+              <rect x="404" y="52" width="150" height="26" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="479" y="69" fill="#e7e7f0" text-anchor="middle">system + tools</text>
+              <rect x="404" y="82" width="150" height="26" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="479" y="99" fill="#e7e7f0" text-anchor="middle">docs + few-shot</text>
+            </g>
+            <text x="560" y="70" fill="#9a9ab0" font-family="'Fira Code',monospace" font-size="10.5">init_session()</text>
+            <line x1="556" y1="94" x2="596" y2="94" stroke="#9a9ab0" stroke-width="1.6" marker-end="url(#ah)"/>
+
+            <!-- session store -->
+            <rect x="600" y="66" width="132" height="52" rx="10" fill="rgba(255,92,240,.16)" stroke="#ff5cf0" stroke-width="1"/>
+            <text x="666" y="90" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">session</text>
+            <text x="666" y="107" fill="#ffb0f4" font-family="'Fira Code',monospace" font-size="10.5" text-anchor="middle">cached prefix</text>
+
+            <!-- turn chip -->
+            <rect x="404" y="196" width="120" height="34" rx="8" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="464" y="217" fill="#e7e7f0" font-size="12" text-anchor="middle">user turn</text>
+            <text x="404" y="186" fill="#9a9ab0" font-family="'Fira Code',monospace" font-size="10.5">↻ every turn (small)</text>
+
+            <!-- process/LLM -->
+            <line x1="524" y1="213" x2="628" y2="213" stroke="#9a9ab0" stroke-width="1.6" marker-end="url(#ah)"/>
+            <text x="536" y="205" fill="#9a9ab0" font-family="'Fira Code',monospace" font-size="10.5">process()</text>
+            <rect x="630" y="186" width="64" height="56" rx="10" fill="rgba(255,255,255,.05)" stroke="var(--border)" stroke-width="1"/>
+            <text x="662" y="219" fill="#e7e7f0" font-size="13" text-anchor="middle" font-weight="600">LLM</text>
+            <!-- session reuse (dashed) -->
+            <line x1="666" y1="118" x2="666" y2="184" stroke="#ff5cf0" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#ahm)"/>
+            <text x="676" y="156" fill="#ffb0f4" font-family="'Fira Code',monospace" font-size="10.5">reuse</text>
+            <!-- answer -->
+            <line x1="662" y1="242" x2="662" y2="270" stroke="#9a9ab0" stroke-width="1.6" marker-end="url(#ah)"/>
+            <text x="662" y="290" fill="#e7e7f0" font-size="12" text-anchor="middle">answer</text>
+            <text x="392" y="262" fill="#7ef0c9" font-family="'Fira Code',monospace" font-size="11">only the turn is processed · prefix from cache</text>
+
+            <defs>
+              <marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9a9ab0"/></marker>
+              <marker id="ahm" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ff5cf0"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption style="color:var(--muted); font-family:'Fira Code',monospace; font-size:.78rem; margin-top:.6rem; text-align:center">Fig 1 — One fat invoke re-processes all static layers every turn (left); the split sends static context once into a cached session, then processes only the new turn (right).</figcaption>
+      </figure>
+
+      <p>
+        The shape is the same one that makes any system easier to reason about: a constructor that runs once, and a
+        method you call many times. Setup happens in one place; the hot path stays tiny.
+      </p>
+
+      <h2><span class="n">04.</span>Why this is actually faster, not just tidier</h2>
+      <p>
+        The speedup is not hand-waving — it falls out of how transformer inference works. A model call has two phases.
+        <strong>Prefill</strong> reads every input token and builds the attention key/value (KV) cache; its cost grows
+        with the size of the prompt and it dominates time-to-first-token for context-heavy calls. <strong>Decode</strong>
+        then generates the answer one token at a time. When your static prefix is huge, prefill is where the wall-clock
+        goes.
+      </p>
+      <p>
+        <strong>Prompt caching</strong> (a.k.a. prefix caching) lets the provider recognize that the static prefix is
+        identical to a recent call and <em>reuse</em> the computed KV state instead of prefilling it again. On Azure
+        OpenAI and OpenAI this is automatic for prompts past a size threshold; the model skips the cached prefix and
+        starts generating almost immediately.
+      </p>
+
+      <figure style="margin:1.8rem 0">
+        <div style="background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:1.1rem; overflow-x:auto">
+          <svg viewBox="0 0 760 230" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="fig2t fig2d" font-family="'Space Grotesk',system-ui,sans-serif">
+            <title id="fig2t">Prefill time saved by caching the static prefix</title>
+            <desc id="fig2d">On the first turn the whole prefix is prefilled. On later turns the cached prefix is skipped, so only the new turn is prefilled before decoding begins, saving time-to-first-token.</desc>
+
+            <!-- turn 1 -->
+            <text x="20" y="52" fill="#9a9ab0" font-family="'Fira Code',monospace" font-size="12">turn 1 · cache miss</text>
+            <rect x="150" y="34" width="360" height="30" rx="5" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+            <text x="330" y="54" fill="#e7e7f0" font-size="12" text-anchor="middle">prefill: static prefix + turn</text>
+            <rect x="512" y="34" width="120" height="30" rx="5" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="572" y="54" fill="#e7e7f0" font-size="12" text-anchor="middle">decode</text>
+
+            <!-- turn 2+ -->
+            <text x="20" y="132" fill="#9a9ab0" font-family="'Fira Code',monospace" font-size="12">turn 2+ · cache hit</text>
+            <rect x="150" y="114" width="72" height="30" rx="5" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+            <text x="186" y="134" fill="#e7e7f0" font-size="11.5" text-anchor="middle">turn</text>
+            <rect x="224" y="114" width="120" height="30" rx="5" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="284" y="134" fill="#e7e7f0" font-size="12" text-anchor="middle">decode</text>
+
+            <!-- saved bracket -->
+            <line x1="222" y1="90" x2="222" y2="160" stroke="rgba(255,255,255,.25)" stroke-width="1" stroke-dasharray="3 4"/>
+            <line x1="510" y1="24" x2="510" y2="90" stroke="rgba(255,255,255,.25)" stroke-width="1" stroke-dasharray="3 4"/>
+            <line x1="222" y1="90" x2="510" y2="90" stroke="#7ef0c9" stroke-width="1.4" marker-start="url(#ahg)" marker-end="url(#ahg)"/>
+            <text x="366" y="83" fill="#7ef0c9" font-family="'Fira Code',monospace" font-size="12" text-anchor="middle">prefill time saved</text>
+
+            <text x="20" y="200" fill="#9a9ab0" font-size="12">The static prefix is prefilled once. On reuse the model skips it and starts generating sooner.</text>
+
+            <defs>
+              <marker id="ahg" markerWidth="8" markerHeight="8" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#7ef0c9"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption style="color:var(--muted); font-family:'Fira Code',monospace; font-size:.78rem; margin-top:.6rem; text-align:center">Fig 2 — Caching skips prefill of the unchanged prefix, so decoding starts sooner on every turn after the first.</figcaption>
+      </figure>
+
+      <blockquote>
+        <p>You are not caching the <em>answer</em>. You are caching the expensive prefill of the context the answer is
+          computed from. The model still thinks fresh every turn — it just stops re-reading the same book first.</p>
+      </blockquote>
+
+      <h2><span class="n">05.</span>Making it real in LangChain + Azure OpenAI</h2>
+      <p>
+        In LangChain the two phases map cleanly onto composition. <code>init_session()</code> builds the runnable once,
+        with the static content pinned to the <strong>front</strong> of the prompt and a placeholder for the dynamic
+        tail. <code>process()</code> just supplies the variables per turn.
+      </p>
+      <pre><code>from langchain_openai import AzureChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+# --- Phase 1: initialize the session ONCE ---
+def init_session():
+    llm = AzureChatOpenAI(azure_deployment="gpt-4o", temperature=0)
+    prompt = ChatPromptTemplate.from_messages([
+        # static prefix — assembled once, byte-identical on every call
+        ("system", BIG_SYSTEM_PROMPT + FEW_SHOT + REFERENCE_DOCS),
+        MessagesPlaceholder("history"),   # dynamic
+        ("human", "{input}"),             # dynamic tail — the only new tokens
+    ])
+    return prompt | llm                   # a reusable, pre-configured session
+
+# --- Phase 2: process each turn CHEAPLY ---
+def process(session, history, user_msg):
+    return session.invoke({"history": history, "input": user_msg})</code></pre>
+      <p>
+        Because the static prefix is identical across calls, Azure OpenAI's automatic prompt caching matches it and
+        skips reprocessing. You can confirm the cache is working by reading the standardized usage on the response:
+      </p>
+      <pre><code>session = init_session()
+resp = process(session, history=[], user_msg="Summarize section 3.")
+
+# cache_read &gt; 0 means the static prefix was served from cache
+print(resp.usage_metadata["input_token_details"])
+# {'cache_read': 3072, ...}</code></pre>
+      <p>
+        Two things earn the win here. First, the static content is concatenated at the very start, so the cacheable
+        prefix is as long as possible. Second, the session object is built once and held — you are not re-reading docs
+        from disk or re-templating the system prompt on every turn. The conversation state itself (the
+        <code>history</code>) lives in your app; wire it through a
+        <a href="https://python.langchain.com/docs/versions/migrating_memory/" target="_blank" rel="noreferrer">message-history wrapper</a>
+        or a LangGraph checkpointer so "the session" is a real object with a lifecycle, not a global.
+      </p>
+
+      <h2><span class="n">06.</span>The one rule that makes or breaks it: keep the prefix byte-stable</h2>
+      <p>
+        Prompt caching matches on an <strong>exact prefix</strong>. Change one character near the front and the cache
+        misses — you silently pay full price again. The failure mode is subtle because nothing errors; latency just
+        quietly regresses. Guard the prefix:
+      </p>
+      <ul>
+        <li><strong>Put dynamic content last, always.</strong> A timestamp, a user id, or a per-request note injected
+          into the <em>system</em> block busts the cache for everyone. Move it into the human turn at the end.</li>
+        <li><strong>Make the prefix deterministic.</strong> Serialize tool schemas and any JSON with stable key order;
+          a dict that renders in random order is a different prefix every time.</li>
+        <li><strong>Mind the size floor.</strong> Automatic caching on Azure OpenAI / OpenAI only kicks in past a
+          threshold (on the order of ~1K tokens). If your static context is tiny, the split still improves code
+          clarity but won't move latency — don't expect caching magic below the floor.</li>
+        <li><strong>Mind the TTL.</strong> Cached prefixes expire after a period of inactivity (minutes). Bursty,
+          back-to-back turns benefit most; a session idle past the TTL pays the cold prefill again on its next turn.</li>
+      </ul>
+      <p>
+        A note on providers: on Azure OpenAI and OpenAI, caching is <em>automatic</em> — you just structure the prompt
+        well. On <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching" target="_blank" rel="noreferrer">Anthropic</a>
+        it's <em>explicit</em> — you mark the end of the static block with a <code>cache_control</code> breakpoint. Same
+        idea, different switch. See the
+        <a href="https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/prompt-caching" target="_blank" rel="noreferrer">Azure OpenAI prompt caching docs</a>
+        for the current thresholds and supported models.
+      </p>
+
+      <h2><span class="n">07.</span>The complexity win, beyond latency</h2>
+      <p>
+        Latency is the headline, but the reason I reach for this split even when caching isn't in play is that it makes
+        the code <strong>simpler</strong>:
+      </p>
+      <ul>
+        <li><strong>Separation of concerns.</strong> Expensive, do-once work (loading docs, building the system prompt,
+          binding tools) lives in <code>init_session()</code>. The per-turn path shrinks to "append input, invoke."
+          Each is easy to read on its own.</li>
+        <li><strong>Testability.</strong> You can build a session in a fixture and hammer <code>process()</code> with
+          many turns, instead of reconstructing the whole world in every test.</li>
+        <li><strong>Consistency.</strong> The static context is assembled exactly once, so it can't drift between turns
+          due to a code path that rebuilds it slightly differently.</li>
+        <li><strong>Throughput.</strong> Less compute per turn means each request holds resources for less time, so the
+          same hardware serves more concurrent sessions.</li>
+      </ul>
+
+      <h2><span class="n">08.</span>When <em>not</em> to split</h2>
+      <p>
+        This is a pattern, not a law. If your static context is small (a one-line system prompt), if calls are truly
+        one-shot with no shared setup, or if every request legitimately needs a different system prompt, the split adds
+        a layer without buying you a cache hit. Reach for it when you have a <strong>large, stable context reused across
+        many turns</strong> — long system prompts, injected documents, big tool schemas, RAG contexts — which is
+        exactly where the naive single invoke hurts most.
+      </p>
+
+      <h2><span class="n">09.</span>Takeaway</h2>
+      <p>
+        A "complex chat invoke" is usually one function doing two jobs: setting up static context and answering a turn.
+        Pull them apart. Initialize the session once, keep the static prefix at the front and byte-stable, and let each
+        turn carry only the new input. You get lower latency from prompt caching, a smaller bill from tokens you stop
+        re-sending, and — quietly — a codebase where setup and the hot path are two things you can reason about
+        separately. Compute the constant once; spend your budget on what actually changes.
+      </p>
+
+      <div class="post-foot">
+        <p style="color:var(--fg); margin-bottom:1.2rem">
+          Wrangling latency out of an LLM feature, or untangling one mega-invoke into something you can maintain? I
+          mentor engineers on exactly this kind of work.
+        </p>
+        <div class="cta" style="display:flex; gap:1rem; flex-wrap:wrap">
+          <a class="btn primary" href="https://topmate.io/pushkar10" target="_blank" rel="noreferrer">Book a 1:1 ↗</a>
+          <a class="btn ghost" href="multi-agent-rag-production.html">Read: Multi-Agent RAG in Production →</a>
+          <a class="btn ghost" href="../blog.html">← More posts</a>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<footer>built with too much coffee ☕ · <a href="https://github.com/pushkarraj/pushkarraj.github.io" style="color:var(--muted)">source</a></footer>
+
+<script>
+// cursor glow
+const glow=document.getElementById('glow');
+addEventListener('mousemove',e=>{glow.style.opacity=1; glow.style.left=e.clientX+'px'; glow.style.top=e.clientY+'px';});
+addEventListener('mouseleave',()=>glow.style.opacity=0);
+// scroll reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in'); io.unobserve(e.target);}
+}),{threshold:.06});
+document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+</script>
+</body>
+</html>
