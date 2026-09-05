@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Parallel LangGraph: Subgraphs, Supersteps, and Async Fan-Out | Pushkar Raj</title>
+<meta name="description" content="How LangGraph runs graphs in parallel — the Pregel superstep model, fan-out/fan-in with reducers, the Send API for map-reduce, async nodes, and running whole subgraphs concurrently. With verified code and diagrams." />
+<meta name="author" content="Pushkar Raj" />
+<link rel="canonical" href="https://pushkarraj.github.io/blog/langgraph-parallel-subgraphs.html" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Parallel LangGraph: Subgraphs, Supersteps, and Async Fan-Out" />
+<meta property="og:description" content="The Pregel superstep model behind LangGraph, fan-out/fan-in with reducers, the Send API for map-reduce, async nodes, and running whole subgraphs in parallel." />
+<meta property="og:url" content="https://pushkarraj.github.io/blog/langgraph-parallel-subgraphs.html" />
+<meta property="og:image" content="https://github.com/pushkarraj.png" />
+<meta property="og:site_name" content="Pushkar Raj" />
+<meta property="article:published_time" content="2026-09-05T10:00:00+05:30" />
+<meta property="article:author" content="Pushkar Raj" />
+<meta property="article:section" content="Generative AI" />
+<meta property="article:tag" content="LangGraph" />
+<meta property="article:tag" content="Parallel Execution" />
+<meta property="article:tag" content="Subgraphs" />
+<meta property="article:tag" content="Async" />
+<meta property="article:tag" content="Pregel" />
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Parallel LangGraph: Subgraphs, Supersteps, and Async Fan-Out" />
+<meta name="twitter:description" content="The Pregel superstep model behind LangGraph, fan-out/fan-in with reducers, the Send API for map-reduce, async nodes, and running whole subgraphs in parallel." />
+<meta name="twitter:image" content="https://github.com/pushkarraj.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Parallel LangGraph: Subgraphs, Supersteps, and Async Fan-Out",
+  "description": "How LangGraph runs graphs in parallel — the Pregel superstep model, fan-out/fan-in with reducers, the Send API for map-reduce, async nodes, and running whole subgraphs concurrently. With verified code and diagrams.",
+  "image": "https://github.com/pushkarraj.png",
+  "datePublished": "2026-09-05T10:00:00+05:30",
+  "dateModified": "2026-09-05T10:00:00+05:30",
+  "author": {
+    "@type": "Person",
+    "name": "Pushkar Raj",
+    "url": "https://pushkarraj.github.io/about.html"
+  },
+  "publisher": {
+    "@type": "Person",
+    "name": "Pushkar Raj"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://pushkarraj.github.io/blog/langgraph-parallel-subgraphs.html"
+  },
+  "keywords": "LangGraph, parallel execution, subgraphs, Pregel, supersteps, bulk synchronous parallel, Send API, map-reduce, async nodes, fan-out fan-in, reducers, state channels",
+  "articleSection": "Generative AI"
+}
+</script>
+</head>
+<body>
+<div class="mesh"><span class="a"></span><span class="b"></span><span class="c"></span></div>
+<div class="grain"></div>
+<div class="glow" id="glow"></div>
+
+<nav>
+  <a class="logo" href="../index.html"><b>~/</b>pushkarraj</a>
+  <ul>
+    <li><a href="../about.html">about</a></li>
+    <li><a href="../index.html#skills">skills</a></li>
+    <li><a href="../projects.html">projects</a></li>
+    <li><a href="../blog.html" class="active">blog</a></li>
+    <li><a href="../mentorship.html">mentorship</a></li>
+    <li><a href="../Pushkar_Raj_resume.pdf" download>resume ↓</a></li>
+    <li><a href="../index.html#contact">contact</a></li>
+  </ul>
+</nav>
+
+<section class="page-head">
+  <a class="post-back" href="../blog.html">← all posts</a>
+  <h2 class="title" style="margin-bottom:.4rem">Parallel LangGraph: Subgraphs, Supersteps, and Async Fan-Out</h2>
+  <div class="post-meta">
+    <span>By Pushkar Raj</span><span class="dot">·</span>
+    <span>Sep 5, 2026</span><span class="dot">·</span>
+    <span>10:00 AM IST</span><span class="dot">·</span>
+    <span>~16 min read</span><span class="dot">·</span>
+    <span>Generative AI</span>
+  </div>
+  <div class="stack">
+    <span>LangGraph</span><span>Parallel Execution</span><span>Subgraphs</span><span>Async</span><span>Pregel</span>
+  </div>
+</section>
+
+<section class="reveal" style="padding-top:0">
+  <article class="post">
+    <p class="post-lede">
+      Most LangGraph apps start as a straight line: node A, then B, then C, each waiting on the last. But three of those
+      nodes might be independent LLM calls, each spending most of its time waiting on the network. Running them one after
+      another is pure wall-clock waste. LangGraph can run them <em>together</em> — and the machinery that makes this safe
+      isn't a thread pool bolted on the side. It's the graph's actual execution model: a runtime called
+      <strong>Pregel</strong> that advances the whole graph in discrete <strong>supersteps</strong>, borrowed straight
+      from Google's Pregel paper. Once you see that model, parallelism — plain fan-out, dynamic <code>Send</code>
+      map-reduce, async nodes, and whole subgraphs running side by side — all fall out of the same idea.
+    </p>
+
+    <div class="post-body">
+      <h2><span class="n">01.</span>The problem: sequential graphs waste wall-clock</h2>
+      <p>
+        Say an assistant needs three things about a topic before it can answer: a summary, a set of risks, and a list of
+        citations. Each is its own LLM call. Wired as a chain, the graph does the obvious slow thing — it runs them in
+        series, and your latency is the <em>sum</em> of three calls even though not one of them depends on the others:
+      </p>
+      <pre><code># ❌ Three independent calls, billed to the clock one after another
+builder.add_edge(START, "summarize")
+builder.add_edge("summarize", "find_risks")
+builder.add_edge("find_risks", "gather_citations")
+builder.add_edge("gather_citations", "answer")
+# total latency ≈ t(summarize) + t(find_risks) + t(gather_citations)</code></pre>
+      <p>
+        LLM calls are <strong>I/O-bound</strong>: the process sits idle waiting for tokens to come back over the wire.
+        That's the textbook case where concurrency helps — while one call waits, the others can be in flight. If the
+        three run together, total latency collapses toward the <em>slowest single call</em> instead of their sum. The
+        rest of this post is about how to express that in LangGraph without corrupting shared state — and why the
+        framework can do it safely.
+      </p>
+
+      <h2><span class="n">02.</span>How LangGraph actually runs: Pregel &amp; supersteps</h2>
+      <p>
+        LangGraph does not "walk" your graph node by node like a call stack. Under the hood it runs a message-passing
+        engine — named <strong>Pregel</strong>, after
+        <a href="https://research.google/pubs/pub37252/" target="_blank" rel="noreferrer">Google's 2010 Pregel paper</a>
+        on large-scale graph processing, which itself is an instance of the
+        <strong>Bulk Synchronous Parallel (BSP)</strong> model. LangChain's own docs put it plainly:
+      </p>
+      <blockquote>
+        <p>"The underlying graph algorithm uses message passing to execute programs in discrete super-steps. A super-step
+          represents an iteration where active nodes process incoming messages and produce updates. Nodes run in
+          <strong>parallel within the same super-step</strong> or sequentially across different ones, and the graph
+          execution terminates once all nodes become inactive and no messages remain in transit."</p>
+      </blockquote>
+      <p>
+        Read that carefully, because the whole post lives inside it. A <strong>superstep</strong> is one tick of the
+        graph. Within a tick, every node that received a message runs — and if several nodes are active at once, they run
+        <em>concurrently</em>. Crucially, their writes to shared state are <strong>not</strong> applied the instant a
+        node finishes. They're collected and committed <em>at the end</em> of the superstep, at a synchronization
+        barrier. Only then does the next superstep begin, activating whatever nodes those writes send messages to.
+      </p>
+
+      <figure style="margin:1.8rem 0">
+        <div style="background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:1.1rem; overflow-x:auto">
+          <svg viewBox="0 0 760 300" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="figbspt figbspd" font-family="'Space Grotesk',system-ui,sans-serif">
+            <title id="figbspt">The bulk-synchronous superstep cycle</title>
+            <desc id="figbspd">Each superstep has three phases: active nodes compute in parallel, a synchronization barrier waits for all of them, then their state updates are committed together before the next superstep begins.</desc>
+
+            <!-- superstep N label -->
+            <text x="24" y="28" fill="#22d3ee" font-family="'Fira Code',monospace" font-size="12" letter-spacing="1.5">SUPERSTEP N</text>
+
+            <!-- parallel compute nodes -->
+            <text x="40" y="66" fill="#9a9ab0" font-size="12">compute (parallel)</text>
+            <rect x="40" y="78" width="150" height="30" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+            <text x="115" y="98" fill="#e7e7f0" font-size="12.5" text-anchor="middle">node A</text>
+            <rect x="40" y="116" width="150" height="30" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+            <text x="115" y="136" fill="#e7e7f0" font-size="12.5" text-anchor="middle">node B</text>
+            <rect x="40" y="154" width="150" height="30" rx="6" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+            <text x="115" y="174" fill="#e7e7f0" font-size="12.5" text-anchor="middle">node C</text>
+
+            <!-- arrows to barrier -->
+            <line x1="192" y1="93"  x2="286" y2="126" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#pah)"/>
+            <line x1="192" y1="131" x2="286" y2="129" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#pah)"/>
+            <line x1="192" y1="169" x2="286" y2="132" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#pah)"/>
+
+            <!-- sync barrier -->
+            <rect x="290" y="70" width="46" height="120" rx="8" fill="rgba(255,92,240,.14)" stroke="#ff5cf0" stroke-width="1.2"/>
+            <text x="313" y="126" fill="#ffb0f4" font-size="12" text-anchor="middle" transform="rotate(-90 313 130)" font-weight="600">sync barrier</text>
+
+            <!-- commit -->
+            <line x1="336" y1="130" x2="392" y2="130" stroke="#9a9ab0" stroke-width="1.6" marker-end="url(#pah)"/>
+            <text x="404" y="120" fill="#9a9ab0" font-size="12">commit updates</text>
+            <rect x="404" y="104" width="150" height="52" rx="10" fill="rgba(34,211,238,.14)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="479" y="126" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">state channels</text>
+            <text x="479" y="144" fill="#7ef0c9" font-family="'Fira Code',monospace" font-size="10.5" text-anchor="middle">reducers merge writes</text>
+
+            <!-- next superstep -->
+            <line x1="554" y1="130" x2="620" y2="130" stroke="#9a9ab0" stroke-width="1.6" marker-end="url(#pah)"/>
+            <rect x="622" y="98" width="116" height="64" rx="10" fill="rgba(255,255,255,.05)" stroke="var(--border)" stroke-width="1"/>
+            <text x="680" y="124" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">superstep</text>
+            <text x="680" y="143" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">N + 1</text>
+
+            <!-- loop back -->
+            <path d="M680 162 L680 250 L115 250 L115 190" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.3" stroke-dasharray="5 5" marker-end="url(#pah)"/>
+            <text x="360" y="270" fill="#9a9ab0" font-size="11.5" text-anchor="middle">messages from committed writes activate the next set of nodes — repeat until none are active</text>
+
+            <defs>
+              <marker id="pah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9a9ab0"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption style="color:var(--muted); font-family:'Fira Code',monospace; font-size:.78rem; margin-top:.6rem; text-align:center">Fig 1 — One superstep: active nodes compute in parallel, a barrier waits for all of them, writes are committed together through the state channels, then the next superstep begins.</figcaption>
+      </figure>
+
+      <p>
+        This is why parallelism in LangGraph is <em>safe by construction</em>. In a normal threaded program, two
+        functions writing the same variable race. In Pregel's BSP model there is no race, because no node ever observes
+        another node's write <em>mid-superstep</em> — everyone reads the state as it was at the start of the tick, and
+        all updates land together at the barrier. The framework only needs one extra thing from you: a rule for how to
+        <em>merge</em> two writes to the same key when they arrive at the same barrier. That rule is a <strong>reducer</strong>,
+        and we'll hit it in section 04.
+      </p>
+
+      <h2><span class="n">03.</span>Fan-out and fan-in with plain edges</h2>
+      <p>
+        The simplest parallelism needs no special API at all. If you add edges from one node to several, those several
+        become active in the <em>same</em> superstep and run concurrently. This is <strong>fan-out</strong>. Add edges
+        from all of them back into one node, and that node waits for the whole batch before it runs — <strong>fan-in</strong>.
+        Here are our three independent calls, done right:
+      </p>
+      <pre><code>from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+class State(TypedDict):
+    topic: str
+    summary: str
+    risks: str
+    citations: str
+    answer: str
+
+def summarize(state: State):
+    return {"summary": llm.invoke(f"Summarize {state['topic']}").content}
+
+def find_risks(state: State):
+    return {"risks": llm.invoke(f"List risks of {state['topic']}").content}
+
+def gather_citations(state: State):
+    return {"citations": llm.invoke(f"Cite sources on {state['topic']}").content}
+
+def answer(state: State):
+    return {"answer": f"{state['summary']}\n\nRisks: {state['risks']}\n\nSources: {state['citations']}"}
+
+builder = StateGraph(State)
+builder.add_node(summarize)
+builder.add_node(find_risks)
+builder.add_node(gather_citations)
+builder.add_node(answer)
+
+# fan-out: all three activate in the SAME superstep
+builder.add_edge(START, "summarize")
+builder.add_edge(START, "find_risks")
+builder.add_edge(START, "gather_citations")
+# fan-in: 'answer' waits for all three, runs in the NEXT superstep
+builder.add_edge("summarize", "answer")
+builder.add_edge("find_risks", "answer")
+builder.add_edge("gather_citations", "answer")
+builder.add_edge("answer", END)
+
+graph = builder.compile()
+result = graph.invoke({"topic": "retrieval-augmented generation"})</code></pre>
+      <p>
+        Superstep 1 runs all three producers concurrently; the barrier collects their writes; superstep 2 runs
+        <code>answer</code>. Notice each producer writes a <em>different</em> key (<code>summary</code>,
+        <code>risks</code>, <code>citations</code>) — so there's nothing to merge and no reducer needed yet. The moment
+        two parallel nodes write the <em>same</em> key, that changes.
+      </p>
+
+      <figure style="margin:1.8rem 0">
+        <div style="background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:1.1rem; overflow-x:auto">
+          <svg viewBox="0 0 760 250" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="fant fand" font-family="'Space Grotesk',system-ui,sans-serif">
+            <title id="fant">Fan-out and fan-in graph shape</title>
+            <desc id="fand">START fans out to three producer nodes that run in parallel in one superstep; all three fan in to a single answer node that runs in the next superstep.</desc>
+
+            <!-- START -->
+            <rect x="30" y="100" width="86" height="40" rx="10" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="73" y="125" fill="#e7e7f0" font-size="13" text-anchor="middle" font-weight="600">START</text>
+
+            <!-- producers -->
+            <g>
+              <rect x="250" y="30"  width="180" height="40" rx="10" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="340" y="55"  fill="#e7e7f0" font-size="12.5" text-anchor="middle">summarize</text>
+              <rect x="250" y="100" width="180" height="40" rx="10" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="340" y="125" fill="#e7e7f0" font-size="12.5" text-anchor="middle">find_risks</text>
+              <rect x="250" y="170" width="180" height="40" rx="10" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="340" y="195" fill="#e7e7f0" font-size="12.5" text-anchor="middle">gather_citations</text>
+            </g>
+
+            <!-- answer -->
+            <rect x="560" y="100" width="150" height="40" rx="10" fill="rgba(255,92,240,.16)" stroke="#ff5cf0" stroke-width="1"/>
+            <text x="635" y="125" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">answer</text>
+
+            <!-- fan-out edges -->
+            <line x1="116" y1="116" x2="246" y2="52"  stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#fah)"/>
+            <line x1="116" y1="120" x2="246" y2="120" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#fah)"/>
+            <line x1="116" y1="124" x2="246" y2="188" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#fah)"/>
+            <!-- fan-in edges -->
+            <line x1="430" y1="52"  x2="556" y2="116" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#fah)"/>
+            <line x1="430" y1="120" x2="556" y2="120" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#fah)"/>
+            <line x1="430" y1="188" x2="556" y2="124" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#fah)"/>
+
+            <text x="340" y="238" fill="#7ef0c9" font-family="'Fira Code',monospace" font-size="11" text-anchor="middle">superstep 1: three nodes in parallel  →  superstep 2: answer</text>
+
+            <defs>
+              <marker id="fah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9a9ab0"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption style="color:var(--muted); font-family:'Fira Code',monospace; font-size:.78rem; margin-top:.6rem; text-align:center">Fig 2 — Edges from START to three nodes fan out into one parallel superstep; edges back into <code>answer</code> fan in and gate the next superstep on all three finishing.</figcaption>
+      </figure>
+
+      <h2><span class="n">04.</span>Concurrent writes need a reducer</h2>
+      <p>
+        Suppose the parallel branches each append to a shared <code>findings</code> list instead of writing separate
+        keys. Two nodes now hand the barrier two writes for the <em>same</em> channel. By default a state key holds a
+        single value and a second write to it in one superstep is ambiguous — LangGraph raises
+        <code>InvalidUpdateError</code> rather than silently dropping one. The fix is to annotate the key with a
+        <strong>reducer</strong>: a function that tells the channel how to combine writes. For "collect into a list,"
+        that's <code>operator.add</code>:
+      </p>
+      <pre><code>import operator
+from typing_extensions import TypedDict, Annotated
+
+class State(TypedDict):
+    topic: str
+    # reducer: concurrent writes to `findings` are CONCATENATED, not overwritten
+    findings: Annotated[list[str], operator.add]
+
+def branch_a(state: State):
+    return {"findings": [f"A: {llm.invoke('angle A on ' + state['topic']).content}"]}
+
+def branch_b(state: State):
+    return {"findings": [f"B: {llm.invoke('angle B on ' + state['topic']).content}"]}
+
+# both return a one-item list; the reducer merges them into ["A: ...", "B: ..."]</code></pre>
+      <p>
+        Without the <code>Annotated[..., operator.add]</code>, those two parallel writes collide at the barrier. With
+        it, the reducer merges them deterministically regardless of which branch finished first — order of the merged
+        list follows LangGraph's deterministic ordering, not a thread-scheduling coin flip. <strong>Rule of thumb: any
+        state key written by more than one node in the same superstep needs a reducer.</strong> This is the single most
+        common bug when people first add parallelism, and the error message is telling you exactly this.
+      </p>
+
+      <h2><span class="n">05.</span>Dynamic parallelism: the <code>Send</code> API</h2>
+      <p>
+        Fan-out with static edges works when you know the branches at build time. But often you don't: you have a
+        <em>list</em> of items — subjects, chunks, sub-questions — discovered at runtime, and you want one parallel
+        branch per item. That's the classic <strong>map-reduce</strong> shape, and LangGraph expresses it with
+        <a href="https://docs.langchain.com/oss/python/langgraph/graph-api" target="_blank" rel="noreferrer"><code>Send</code></a>.
+        A conditional edge returns a <em>list</em> of <code>Send(node_name, state)</code> objects — one per item — and
+        LangGraph spins up that many parallel invocations of the target node, each with its own slice of state:
+      </p>
+      <pre><code>from langgraph.graph import StateGraph, START, END
+from langgraph.types import Send
+from typing_extensions import TypedDict, Annotated
+import operator
+
+class OverallState(TypedDict):
+    topic: str
+    subjects: list[str]
+    jokes: Annotated[list[str], operator.add]   # reducer: parallel branches append here
+
+def generate_topics(state: OverallState):
+    return {"subjects": ["lions", "elephants", "penguins"]}
+
+# The mapper: one Send per subject → N parallel copies of generate_joke
+def continue_to_jokes(state: OverallState):
+    return [Send("generate_joke", {"subject": s}) for s in state["subjects"]]
+
+def generate_joke(state: dict):
+    # note: this node receives the PER-ITEM state sent to it, not the whole OverallState
+    return {"jokes": [llm.invoke(f"Tell a joke about {state['subject']}").content]}
+
+def best_joke(state: OverallState):
+    return {"best_selected_joke": pick_best(state["jokes"])}
+
+builder = StateGraph(OverallState)
+builder.add_node("generate_topics", generate_topics)
+builder.add_node("generate_joke", generate_joke)
+builder.add_node("best_joke", best_joke)
+builder.add_edge(START, "generate_topics")
+builder.add_conditional_edges("generate_topics", continue_to_jokes, ["generate_joke"])
+builder.add_edge("generate_joke", "best_joke")
+builder.add_edge("best_joke", END)
+graph = builder.compile()</code></pre>
+      <p>
+        Two things make <code>Send</code> different from a normal edge. First, the number of branches is
+        <strong>dynamic</strong> — three subjects here, three hundred next time, decided at runtime. Second, each branch
+        gets a <strong>custom state</strong> (<code>{"subject": s}</code>), not the full shared state — so the mapped
+        node is written against just the slice it needs. All those <code>generate_joke</code> invocations run in one
+        superstep; they all append to <code>jokes</code> via the reducer; then <code>best_joke</code> reduces the
+        collected results. That's map (parallel <code>Send</code>) and reduce (reducer + aggregator node) in the graph's
+        native vocabulary.
+      </p>
+
+      <figure style="margin:1.8rem 0">
+        <div style="background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:1.1rem; overflow-x:auto">
+          <svg viewBox="0 0 760 260" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="sendt sendd" font-family="'Space Grotesk',system-ui,sans-serif">
+            <title id="sendt">The Send API map-reduce shape</title>
+            <desc id="sendd">A mapper node emits one Send per runtime item, spawning a dynamic number of parallel copies of a worker node, whose outputs are merged by a reducer and consumed by an aggregator.</desc>
+
+            <!-- topics -->
+            <rect x="24" y="100" width="140" height="42" rx="10" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="94" y="120" fill="#e7e7f0" font-size="12" text-anchor="middle" font-weight="600">generate_topics</text>
+            <text x="94" y="136" fill="#7ef0c9" font-family="'Fira Code',monospace" font-size="9.5" text-anchor="middle">subjects=[…]</text>
+
+            <!-- Send fan -->
+            <text x="210" y="34" fill="#ffb0f4" font-family="'Fira Code',monospace" font-size="10.5">Send() × N (runtime)</text>
+            <g>
+              <rect x="250" y="40"  width="180" height="34" rx="9" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="340" y="62"  fill="#e7e7f0" font-size="11.5" text-anchor="middle">generate_joke · lions</text>
+              <rect x="250" y="104" width="180" height="34" rx="9" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="340" y="126" fill="#e7e7f0" font-size="11.5" text-anchor="middle">generate_joke · elephants</text>
+              <rect x="250" y="168" width="180" height="34" rx="9" fill="rgba(124,92,255,.20)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="340" y="190" fill="#e7e7f0" font-size="11.5" text-anchor="middle">generate_joke · penguins</text>
+            </g>
+
+            <!-- edges topics -> sends -->
+            <line x1="164" y1="112" x2="246" y2="60"  stroke="#ff5cf0" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#sah)"/>
+            <line x1="164" y1="120" x2="246" y2="121" stroke="#ff5cf0" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#sah)"/>
+            <line x1="164" y1="128" x2="246" y2="182" stroke="#ff5cf0" stroke-width="1.4" stroke-dasharray="4 4" marker-end="url(#sah)"/>
+
+            <!-- reducer -->
+            <rect x="470" y="96" width="120" height="50" rx="10" fill="rgba(34,211,238,.14)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="530" y="117" fill="#e7e7f0" font-size="11.5" text-anchor="middle" font-weight="600">jokes[]</text>
+            <text x="530" y="134" fill="#7ef0c9" font-family="'Fira Code',monospace" font-size="9.5" text-anchor="middle">operator.add</text>
+            <line x1="430" y1="57"  x2="466" y2="112" stroke="#9a9ab0" stroke-width="1.4" marker-end="url(#sah)"/>
+            <line x1="430" y1="121" x2="466" y2="121" stroke="#9a9ab0" stroke-width="1.4" marker-end="url(#sah)"/>
+            <line x1="430" y1="185" x2="466" y2="130" stroke="#9a9ab0" stroke-width="1.4" marker-end="url(#sah)"/>
+
+            <!-- aggregator -->
+            <rect x="630" y="96" width="104" height="50" rx="10" fill="rgba(255,92,240,.16)" stroke="#ff5cf0" stroke-width="1"/>
+            <text x="682" y="126" fill="#e7e7f0" font-size="12" text-anchor="middle" font-weight="600">best_joke</text>
+            <line x1="590" y1="121" x2="626" y2="121" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#sah)"/>
+
+            <text x="380" y="238" fill="#9a9ab0" font-size="11" text-anchor="middle">map: parallel Sends in one superstep   ·   reduce: reducer merges, aggregator consumes</text>
+
+            <defs>
+              <marker id="sah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9a9ab0"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption style="color:var(--muted); font-family:'Fira Code',monospace; font-size:.78rem; margin-top:.6rem; text-align:center">Fig 3 — <code>Send</code> emits one branch per runtime item (dashed = dynamic), all mapped copies run in a single superstep, and a reducer + aggregator fold the results back together.</figcaption>
+      </figure>
+
+      <h2><span class="n">06.</span>Make it async</h2>
+      <p>
+        Parallel nodes running <em>concurrently</em> still deliver their biggest win when the nodes are
+        <strong>async</strong>. Define a node with <code>async def</code> and <code>await</code> the model call, then
+        drive the graph with <code>ainvoke</code> / <code>astream</code>. Now while one branch is awaiting tokens, the
+        event loop actually runs the others — true overlap of I/O on a single thread, no thread pool required:
+      </p>
+      <pre><code>from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START
+from langchain.chat_models import init_chat_model
+
+model = init_chat_model("gpt-4o")
+
+class State(TypedDict):
+    topic: str
+    joke: str
+
+# async node — accept `config` and pass it through for correct context propagation
+async def call_model(state: State, config):
+    resp = await model.ainvoke(
+        [{"role": "user", "content": f"Write a joke about {state['topic']}"}],
+        config,
+    )
+    return {"joke": resp.content}
+
+graph = (
+    StateGraph(State)
+    .add_node(call_model)
+    .add_edge(START, "call_model")
+    .compile()
+)
+
+# drive it on the event loop
+result = await graph.ainvoke({"topic": "ice cream"})
+
+# or stream tokens as they arrive
+async for chunk in graph.astream({"topic": "ice cream"}, stream_mode="messages"):
+    ...</code></pre>
+      <p>
+        The rule that trips people up: <strong>don't mix sync and async carelessly</strong>. A blocking
+        <code>llm.invoke()</code> inside an <code>async def</code> node stalls the whole event loop and quietly kills
+        your concurrency — every "parallel" branch ends up waiting behind it. If a node is async, its I/O must be
+        awaited (<code>ainvoke</code>, <code>astream</code>, async DB/HTTP clients). And always thread the
+        <code>config</code> argument through to <code>ainvoke</code> so tracing, callbacks, and cancellation propagate
+        correctly. Combine async with the fan-out or <code>Send</code> patterns above and the parallel branches genuinely
+        overlap rather than merely being <em>scheduled</em> together.
+      </p>
+
+      <h2><span class="n">07.</span>Subgraphs as parallel units</h2>
+      <p>
+        Everything so far parallelizes single nodes. But real branches are rarely one call — a "research one source"
+        branch might retrieve, then summarize, then score. LangGraph lets you package that whole pipeline as a
+        <strong>subgraph</strong>: a graph compiled on its own, then dropped into a parent graph as if it were a single
+        node. The parent doesn't care that the node is internally three steps; it treats it as one unit. And because
+        it's just a node, <em>you can fan out to several subgraphs and they run in parallel</em>.
+      </p>
+      <p>
+        When the subgraph shares state keys with the parent, you add the compiled subgraph directly as a node — it reads
+        and writes the parent's channels automatically:
+      </p>
+      <pre><code>from typing_extensions import TypedDict
+from langgraph.graph import StateGraph, START, END
+
+# --- a subgraph: its own little pipeline, shares the `topic`/`findings` keys ---
+class ResearchState(TypedDict):
+    topic: str
+    draft: str
+    findings: Annotated[list[str], operator.add]
+
+def retrieve(state: ResearchState):
+    return {"draft": search(state["topic"])}
+
+def summarize(state: ResearchState):
+    return {"findings": [llm.invoke(f"Summarize: {state['draft']}").content]}
+
+research = (
+    StateGraph(ResearchState)
+    .add_node(retrieve).add_node(summarize)
+    .add_edge(START, "retrieve").add_edge("retrieve", "summarize")
+    .compile()
+)</code></pre>
+      <p>
+        If the subgraph has its own private schema that doesn't line up with the parent's keys, you wrap it in a node
+        that transforms parent state → subgraph input and back:
+      </p>
+      <pre><code>class ParentState(TypedDict):
+    topic: str
+    findings: Annotated[list[str], operator.add]
+
+# wrapper: translate parent state into the subgraph's schema, then map the result back
+def run_research(state: ParentState):
+    out = research.invoke({"topic": state["topic"], "findings": []})
+    return {"findings": out["findings"]}</code></pre>
+      <p>
+        Now fan out to <em>several</em> subgraph-backed nodes exactly like section 03 — each runs its full internal
+        pipeline concurrently within one superstep of the parent:
+      </p>
+      <pre><code>parent = StateGraph(ParentState)
+parent.add_node("web_research", run_web_research)     # each of these is a
+parent.add_node("docs_research", run_docs_research)   # compiled subgraph (or a
+parent.add_node("news_research", run_news_research)   # wrapper around one)
+parent.add_node("synthesize", synthesize)
+
+parent.add_edge(START, "web_research")     # fan-out: three subgraphs,
+parent.add_edge(START, "docs_research")    # all active in the SAME
+parent.add_edge(START, "news_research")    # parent superstep
+parent.add_edge("web_research", "synthesize")
+parent.add_edge("docs_research", "synthesize")
+parent.add_edge("news_research", "synthesize")
+parent.add_edge("synthesize", END)
+graph = parent.compile()</code></pre>
+
+      <figure style="margin:1.8rem 0">
+        <div style="background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:1.1rem; overflow-x:auto">
+          <svg viewBox="0 0 760 280" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="subt subd" font-family="'Space Grotesk',system-ui,sans-serif">
+            <title id="subt">Three subgraphs running in parallel inside a parent superstep</title>
+            <desc id="subd">The parent graph fans out to three subgraph nodes; each subgraph is its own retrieve-then-summarize pipeline, and all three run concurrently in one parent superstep before fanning in to a synthesize node.</desc>
+
+            <!-- START -->
+            <rect x="24" y="118" width="80" height="40" rx="10" fill="rgba(34,211,238,.18)" stroke="#22d3ee" stroke-width="1"/>
+            <text x="64" y="143" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">START</text>
+
+            <!-- three subgraph boxes (each a mini pipeline) -->
+            <g font-size="10.5">
+              <!-- web -->
+              <rect x="180" y="24" width="256" height="58" rx="12" fill="rgba(124,92,255,.10)" stroke="#7c5cff" stroke-width="1.2"/>
+              <text x="192" y="42" fill="#c9b8ff" font-family="'Fira Code',monospace" font-size="9.5">subgraph: web_research</text>
+              <rect x="196" y="48" width="96" height="24" rx="6" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="244" y="64" fill="#e7e7f0" text-anchor="middle">retrieve</text>
+              <line x1="292" y1="60" x2="316" y2="60" stroke="#9a9ab0" stroke-width="1.3" marker-end="url(#uah)"/>
+              <rect x="320" y="48" width="100" height="24" rx="6" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="370" y="64" fill="#e7e7f0" text-anchor="middle">summarize</text>
+
+              <!-- docs -->
+              <rect x="180" y="110" width="256" height="58" rx="12" fill="rgba(124,92,255,.10)" stroke="#7c5cff" stroke-width="1.2"/>
+              <text x="192" y="128" fill="#c9b8ff" font-family="'Fira Code',monospace" font-size="9.5">subgraph: docs_research</text>
+              <rect x="196" y="134" width="96" height="24" rx="6" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="244" y="150" fill="#e7e7f0" text-anchor="middle">retrieve</text>
+              <line x1="292" y1="146" x2="316" y2="146" stroke="#9a9ab0" stroke-width="1.3" marker-end="url(#uah)"/>
+              <rect x="320" y="134" width="100" height="24" rx="6" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="370" y="150" fill="#e7e7f0" text-anchor="middle">summarize</text>
+
+              <!-- news -->
+              <rect x="180" y="196" width="256" height="58" rx="12" fill="rgba(124,92,255,.10)" stroke="#7c5cff" stroke-width="1.2"/>
+              <text x="192" y="214" fill="#c9b8ff" font-family="'Fira Code',monospace" font-size="9.5">subgraph: news_research</text>
+              <rect x="196" y="220" width="96" height="24" rx="6" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="244" y="236" fill="#e7e7f0" text-anchor="middle">retrieve</text>
+              <line x1="292" y1="232" x2="316" y2="232" stroke="#9a9ab0" stroke-width="1.3" marker-end="url(#uah)"/>
+              <rect x="320" y="220" width="100" height="24" rx="6" fill="rgba(124,92,255,.22)" stroke="#7c5cff" stroke-width="1"/>
+              <text x="370" y="236" fill="#e7e7f0" text-anchor="middle">summarize</text>
+            </g>
+
+            <!-- START -> subgraphs -->
+            <line x1="104" y1="132" x2="176" y2="54"  stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#uah)"/>
+            <line x1="104" y1="138" x2="176" y2="139" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#uah)"/>
+            <line x1="104" y1="144" x2="176" y2="225" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#uah)"/>
+
+            <!-- synthesize -->
+            <rect x="600" y="118" width="136" height="42" rx="10" fill="rgba(255,92,240,.16)" stroke="#ff5cf0" stroke-width="1"/>
+            <text x="668" y="144" fill="#e7e7f0" font-size="12.5" text-anchor="middle" font-weight="600">synthesize</text>
+            <line x1="436" y1="54"  x2="596" y2="132" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#uah)"/>
+            <line x1="436" y1="139" x2="596" y2="139" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#uah)"/>
+            <line x1="436" y1="225" x2="596" y2="146" stroke="#9a9ab0" stroke-width="1.5" marker-end="url(#uah)"/>
+
+            <defs>
+              <marker id="uah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9a9ab0"/></marker>
+            </defs>
+          </svg>
+        </div>
+        <figcaption style="color:var(--muted); font-family:'Fira Code',monospace; font-size:.78rem; margin-top:.6rem; text-align:center">Fig 4 — Each parent node is a whole compiled subgraph (retrieve → summarize). Fanning out to three of them runs three full pipelines in parallel within one parent superstep, then fans in to <code>synthesize</code>.</figcaption>
+      </figure>
+
+      <h2><span class="n">08.</span><code>Send</code> into subgraphs: dynamic parallel pipelines</h2>
+      <p>
+        The two big ideas compose. When the number of research branches is itself dynamic — one subgraph run per
+        document you retrieved, say — point <code>Send</code> at a node backed by a subgraph. You get a
+        <em>runtime-sized</em> fan-out where each parallel branch is a full multi-step pipeline, not a single call:
+      </p>
+      <pre><code>from langgraph.types import Send
+
+def fan_out_to_research(state: ParentState):
+    # one full research subgraph per source, count decided at runtime
+    return [Send("research_one", {"topic": src}) for src in state["sources"]]
+
+def research_one(state: dict):
+    # this node IS a subgraph invocation over a single source
+    out = research.invoke({"topic": state["topic"], "findings": []})
+    return {"findings": out["findings"]}   # merged via the reducer on ParentState
+
+parent.add_conditional_edges("plan", fan_out_to_research, ["research_one"])</code></pre>
+      <p>
+        This is the pattern behind most production "parallel research" agents: a planner emits N sources, each fans out
+        into an independent research subgraph, all run concurrently in one superstep, and their findings merge through a
+        reducer for a final synthesis pass. Map-reduce, but every mapped unit is a pipeline.
+      </p>
+
+      <h2><span class="n">09.</span>Gotchas the superstep model forces on you</h2>
+      <ul>
+        <li><strong>The barrier gates on the slowest branch.</strong> A superstep ends only when <em>every</em> active
+          node in it finishes. Fan out to five branches and one is slow, and the whole step waits for that straggler —
+          your parallel step is only as fast as its slowest member. Don't lump a 200ms call and a 30s call into the same
+          fan-out if you can help it.</li>
+        <li><strong>Shared keys need reducers — always.</strong> Any channel written by two+ parallel nodes without an
+          <code>Annotated[..., reducer]</code> throws <code>InvalidUpdateError</code>. Separate keys, or a reducer.
+          There is no third option.</li>
+        <li><strong>Async means async all the way down.</strong> One blocking call in an <code>async</code> node
+          serializes the event loop and silently erases your concurrency. Audit that every awaited path uses async
+          clients.</li>
+        <li><strong>One branch erroring fails the superstep.</strong> By default an unhandled exception in any parallel
+          branch aborts the step. If a branch is allowed to fail, catch inside the node and return a sentinel into the
+          reduced state rather than letting it throw — otherwise one flaky source sinks the whole fan-out.</li>
+        <li><strong>Don't parallelize dependent work.</strong> If B needs A's output, they belong in different
+          supersteps (a plain edge), not the same fan-out. Parallelism is for <em>independent</em> branches; forcing
+          dependent ones concurrent just corrupts state or deadlocks on data that isn't there yet.</li>
+      </ul>
+
+      <h2><span class="n">10.</span>Takeaway</h2>
+      <p>
+        LangGraph's parallelism isn't a feature layered on top — it's the execution model showing through. The runtime
+        is <strong>Pregel</strong>; it advances the graph in <strong>supersteps</strong>; within a superstep, active
+        nodes run concurrently and their writes commit together at a synchronization barrier. Everything practical
+        follows from that one fact: fan out with plain edges for known branches, use <code>Send</code> for dynamic
+        map-reduce, make nodes <code>async</code> so I/O genuinely overlaps, and wrap multi-step branches as
+        <strong>subgraphs</strong> so a single parallel unit can be a whole pipeline. Give every shared key a reducer,
+        keep dependent work in separate supersteps, and remember the barrier waits for your slowest branch. Do that and
+        a graph that used to add up its latencies starts spending only as long as its slowest independent step —
+        which is the whole point.
+      </p>
+
+      <div class="post-foot">
+        <p style="color:var(--fg); margin-bottom:1.2rem">
+          Building multi-step agents on LangGraph and fighting latency or tangled state? Parallelism, subgraphs, and the
+          superstep model are exactly the kind of thing I help engineers get right.
+        </p>
+        <div class="cta" style="display:flex; gap:1rem; flex-wrap:wrap">
+          <a class="btn primary" href="https://topmate.io/pushkar10" target="_blank" rel="noreferrer">Book a 1:1 ↗</a>
+          <a class="btn ghost" href="multi-agent-rag-production.html">Read: Multi-Agent RAG in Production →</a>
+          <a class="btn ghost" href="../blog.html">← More posts</a>
+        </div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<footer>built with too much coffee ☕ · <a href="https://github.com/pushkarraj/pushkarraj.github.io" style="color:var(--muted)">source</a></footer>
+
+<script>
+// cursor glow
+const glow=document.getElementById('glow');
+addEventListener('mousemove',e=>{glow.style.opacity=1; glow.style.left=e.clientX+'px'; glow.style.top=e.clientY+'px';});
+addEventListener('mouseleave',()=>glow.style.opacity=0);
+// scroll reveal
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  if(e.isIntersecting){e.target.classList.add('in'); io.unobserve(e.target);}
+}),{threshold:0});
+document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+</script>
+</body>
+</html>
